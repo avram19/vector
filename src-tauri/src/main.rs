@@ -2,6 +2,7 @@
 
 mod config;
 mod pty;
+mod sessions;
 
 use serde::Serialize;
 use std::sync::Arc;
@@ -57,6 +58,7 @@ async fn start_session(
     cols: u16,
     rows: u16,
     cwd: Option<String>,
+    resume_id: Option<String>,
 ) -> Result<(), String> {
     let (program, mut env) = {
         let cfg = state.config.lock();
@@ -78,6 +80,14 @@ async fn start_session(
             resolved[0] = p.to_string_lossy().to_string();
         } else if agent_id != "__shell__" {
             return Err(format!("binary not found in PATH: {}", resolved[0]));
+        }
+    }
+
+    // Append agent-specific resume arguments.
+    if let Some(sid) = resume_id.as_ref().filter(|s| !s.is_empty()) {
+        match agent_id.as_str() {
+            "claude" => { resolved.push("--resume".into()); resolved.push(sid.clone()); }
+            _ => {} // other agents: no-op for now
         }
     }
 
@@ -111,6 +121,38 @@ async fn kill_session(state: State<'_, AppState>, session_id: String) -> Result<
     state.registry.kill(&session_id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn list_sessions(agent_id: String, cwd: String) -> Result<Vec<sessions::SessionSummary>, String> {
+    let p = std::path::PathBuf::from(&cwd);
+    match agent_id.as_str() {
+        "claude" => Ok(sessions::list_claude_sessions(&p)),
+        _ => Ok(vec![]),
+    }
+}
+
+#[tauri::command]
+async fn search_sessions(agent_id: String, cwd: String, query: String) -> Result<Vec<sessions::SessionSummary>, String> {
+    let p = std::path::PathBuf::from(&cwd);
+    match agent_id.as_str() {
+        "claude" => Ok(sessions::search_claude_sessions(&p, &query)),
+        _ => Ok(vec![]),
+    }
+}
+
+#[tauri::command]
+async fn get_session(agent_id: String, cwd: String, session_id: String) -> Result<Option<sessions::SessionDetail>, String> {
+    let p = std::path::PathBuf::from(&cwd);
+    match agent_id.as_str() {
+        "claude" => Ok(sessions::get_claude_session(&p, &session_id)),
+        _ => Ok(None),
+    }
+}
+
+#[tauri::command]
+async fn supported_resume_agents() -> Result<Vec<String>, String> {
+    Ok(vec!["claude".into()])
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -121,7 +163,8 @@ fn main() {
             config: parking_lot::Mutex::new(config::load()),
         })
         .invoke_handler(tauri::generate_handler![
-            list_agents, default_agent, start_session, write_stdin, resize_pty, kill_session
+            list_agents, default_agent, start_session, write_stdin, resize_pty, kill_session,
+            list_sessions, search_sessions, get_session, supported_resume_agents
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");

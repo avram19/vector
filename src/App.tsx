@@ -14,7 +14,10 @@ import "@xterm/xterm/css/xterm.css";
 import logoUrl from "./logo.png";
 
 type AgentMeta = { id: string; label: string; available: boolean };
-type Tab = { id: string; agentId: string; cwd: string; epoch: number };
+type Tab = { id: string; agentId: string; cwd: string; resumeId?: string; epoch: number };
+type SessionSummary = { id: string; agentId: string; title: string; modifiedMs: number; messageCount: number };
+type PreviewMessage = { role: string; kind: "text" | "system"; label?: string; text: string };
+type SessionDetail = { id: string; agentId: string; title: string; modifiedMs: number; messages: PreviewMessage[] };
 type Theme = "dark" | "light";
 type Orientation = "horizontal" | "vertical";
 type PickerState = { open: boolean; forTabId?: string };
@@ -172,27 +175,20 @@ export default function App() {
     setPicker((p) => ({ ...p, open: false }));
   }, []);
 
-  const applyPick = useCallback((path: string) => {
+  const applyPick = useCallback((path: string, agentId: string, resumeId?: string) => {
     pushRecent(path);
     setPicker((p) => {
       if (p.forTabId) {
         const id = p.forTabId;
-        setTabs((prev) => prev.map((t) => t.id === id ? { ...t, cwd: path, epoch: t.epoch + 1 } : t));
+        setTabs((prev) => prev.map((t) => t.id === id ? { ...t, cwd: path, agentId, resumeId, epoch: t.epoch + 1 } : t));
       } else {
-        const t: Tab = { id: crypto.randomUUID(), agentId: defaultAgent, cwd: path, epoch: 0 };
+        const t: Tab = { id: crypto.randomUUID(), agentId, cwd: path, resumeId, epoch: 0 };
         setTabs((prev) => [...prev, t]);
         setActiveId(t.id);
       }
       return { open: false };
     });
-  }, [defaultAgent, pushRecent]);
-
-  const pickFolder = useCallback(async () => {
-    try {
-      const selected = await openDialog({ directory: true, multiple: false });
-      if (typeof selected === "string") applyPick(selected);
-    } catch {}
-  }, [applyPick]);
+  }, [pushRecent]);
 
   const closeTab = useCallback((id: string) => {
     setTabs((prev) => {
@@ -210,7 +206,7 @@ export default function App() {
   }, [activeId]);
 
   const changeActiveAgent = useCallback((agentId: string) => {
-    setTabs((prev) => prev.map((t) => t.id === activeId ? { ...t, agentId, epoch: t.epoch + 1 } : t));
+    setTabs((prev) => prev.map((t) => t.id === activeId ? { ...t, agentId, resumeId: undefined, epoch: t.epoch + 1 } : t));
   }, [activeId]);
 
   const onTitle = useCallback((tabId: string, title: string) => {
@@ -289,7 +285,7 @@ export default function App() {
       <div className="topbar">
         {activeTab ? (
           <button className="project-btn" onClick={() => openPickerForTab(activeTab.id)} title={activeTab.cwd}>
-            <span className="project-dot" /> {basename(activeTab.cwd)}
+            <VectorMark size={14} /> {basename(activeTab.cwd)}
           </button>
         ) : <div style={{ flex: "0 0 auto" }} />}
         <select
@@ -337,6 +333,7 @@ export default function App() {
               tabId={t.id}
               agentId={t.agentId}
               cwd={t.cwd}
+              resumeId={t.resumeId}
               visible={t.id === activeId}
               theme={xtermTheme}
               onBell={onBell}
@@ -350,11 +347,12 @@ export default function App() {
       {picker.open && (
         <PickerModal
           recents={recents}
+          agents={agents}
+          defaultAgent={defaultAgent}
           onPick={applyPick}
-          onBrowse={pickFolder}
           onRemoveRecent={(p) => { const next = recents.filter((r) => r !== p); setRecents(next); saveRecents(next); }}
           onClose={tabs.length > 0 ? closePicker : undefined}
-          title={picker.forTabId ? "Change project for this tab" : "Open a project"}
+          headerTitle={picker.forTabId ? "Change project for this tab" : "Open a project"}
         />
       )}
     </>
@@ -374,47 +372,215 @@ function VectorMark({ size = 24 }: { size?: number }) {
   return <img src={logoUrl} width={size} height={size} alt="Vector" style={{ display: "block" }} />;
 }
 
+function relativeTime(ms: number): string {
+  if (!ms) return "";
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ms).toLocaleDateString();
+}
+
 function PickerModal({
   recents,
+  agents,
+  defaultAgent,
   onPick,
-  onBrowse,
   onRemoveRecent,
   onClose,
-  title,
+  headerTitle,
 }: {
   recents: string[];
-  onPick: (p: string) => void;
-  onBrowse: () => void;
+  agents: AgentMeta[];
+  defaultAgent: string;
+  onPick: (path: string, agentId: string, resumeId?: string) => void;
   onRemoveRecent: (p: string) => void;
   onClose?: () => void;
-  title: string;
+  headerTitle: string;
 }) {
+  const [step, setStep] = useState<"project" | "session">("project");
+  const [project, setProject] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string>(defaultAgent);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<SessionDetail | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const previewBodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!preview || !previewBodyRef.current) return;
+    // Scroll to the latest message after the DOM paints
+    const el = previewBodyRef.current;
+    requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }, [preview]);
+
+  useEffect(() => { setAgentId(defaultAgent); }, [defaultAgent]);
+
+  const installedAgents = agents.filter((a) => a.available);
+
+  const goToSessionStep = (path: string) => {
+    setProject(path);
+    setStep("session");
+    setSelectedId(null);
+    setPreview(null);
+    setQuery("");
+  };
+
+  const browse = async () => {
+    try {
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (typeof selected === "string") goToSessionStep(selected);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (step !== "session" || !project) return;
+    const q = query.trim();
+    setSessionsLoading(true);
+    const cmd = q ? "search_sessions" : "list_sessions";
+    const args: Record<string, unknown> = q
+      ? { agentId, cwd: project, query: q }
+      : { agentId, cwd: project };
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      invoke<SessionSummary[]>(cmd, args)
+        .then((s) => { if (cancelled) return; setSessions(s); setSessionsLoading(false); setSelectedId(s[0]?.id ?? null); })
+        .catch(() => { if (cancelled) return; setSessions([]); setSessionsLoading(false); });
+    }, q ? 300 : 0);
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [step, project, agentId, query]);
+
+  useEffect(() => {
+    if (!selectedId || !project) { setPreview(null); return; }
+    setPreviewLoading(true);
+    invoke<SessionDetail | null>("get_session", { agentId, cwd: project, sessionId: selectedId })
+      .then((d) => { setPreview(d); setPreviewLoading(false); })
+      .catch(() => { setPreview(null); setPreviewLoading(false); });
+  }, [selectedId, project, agentId]);
+
+  if (step === "project") {
+    return (
+      <div className="picker-overlay" onClick={onClose}>
+        <div className="picker-card" onClick={(e) => e.stopPropagation()}>
+          <div className="picker-head">
+            <div className="picker-brand"><VectorMark /> <span>Vector</span></div>
+            {onClose && <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>}
+          </div>
+          <h2>{headerTitle}</h2>
+          <p className="picker-sub">Choose the directory the agent should work in.</p>
+          <button className="picker-primary" onClick={browse}>Choose folder…</button>
+          {recents.length > 0 && (
+            <>
+              <div className="picker-section">Recent</div>
+              <ul className="picker-list">
+                {recents.map((p) => (
+                  <li key={p}>
+                    <button className="recent-row" onClick={() => goToSessionStep(p)} title={p}>
+                      <span className="recent-name">{basename(p)}</span>
+                      <span className="recent-path">{p}</span>
+                    </button>
+                    <button className="recent-x" onClick={() => onRemoveRecent(p)} title="Remove from recents">×</button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="picker-overlay" onClick={onClose}>
-      <div className="picker-card" onClick={(e) => e.stopPropagation()}>
+      <div className="picker-card picker-card--wide" onClick={(e) => e.stopPropagation()}>
         <div className="picker-head">
-          <div className="picker-brand"><VectorMark /> <span>Vector</span></div>
-          {onClose && <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>}
-        </div>
-        <h2>{title}</h2>
-        <p className="picker-sub">Choose the directory the agent should work in.</p>
-        <button className="picker-primary" onClick={onBrowse}>Choose folder…</button>
-        {recents.length > 0 && (
-          <>
-            <div className="picker-section">Recent</div>
-            <ul className="picker-list">
-              {recents.map((p) => (
-                <li key={p}>
-                  <button className="recent-row" onClick={() => onPick(p)} title={p}>
-                    <span className="recent-name">{basename(p)}</span>
-                    <span className="recent-path">{p}</span>
-                  </button>
-                  <button className="recent-x" onClick={() => onRemoveRecent(p)} title="Remove from recents">×</button>
-                </li>
+          <button className="icon-btn" onClick={() => { setStep("project"); setQuery(""); setSelectedId(null); setPreview(null); setSessions([]); }} title="Back" aria-label="Back">←</button>
+          <div className="picker-brand" style={{ marginLeft: 6 }}>
+            <VectorMark /> <span>{basename(project ?? "")}</span>
+          </div>
+          <div className="picker-head-right">
+            <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+              {installedAgents.map((a) => (
+                <option key={a.id} value={a.id}>{a.label}</option>
               ))}
-            </ul>
-          </>
-        )}
+              <option value="__shell__">shell</option>
+            </select>
+            <button className="picker-primary" onClick={() => project && onPick(project, agentId)}>+ New session</button>
+            {onClose && <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>}
+          </div>
+        </div>
+        <div className="session-body">
+          <div className="session-list">
+            {(sessions.length > 0 || query.trim().length > 0 || sessionsLoading) && (
+              <input
+                className="session-search"
+                placeholder="Search this project's sessions…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+              />
+            )}
+            {sessionsLoading ? (
+              <div className="session-muted">Loading…</div>
+            ) : sessions.length === 0 ? (
+              <div className="session-muted">
+                {agentId === "claude" ? "No previous sessions in this project." : "Resume isn't supported for this agent yet."}
+              </div>
+            ) : (
+              sessions.map((s) => (
+                <button
+                  key={s.id}
+                  className={`session-row${selectedId === s.id ? " selected" : ""}`}
+                  onClick={() => setSelectedId(s.id)}
+                  onDoubleClick={() => project && onPick(project, agentId, s.id)}
+                  title={s.title}
+                >
+                  <div className="session-title">{s.title || "(untitled)"}</div>
+                  <div className="session-meta">
+                    <span title={new Date(s.modifiedMs).toLocaleString()}>{relativeTime(s.modifiedMs)}</span>
+                    {s.messageCount > 0 && <span>· {s.messageCount} messages</span>}
+                  </div>
+                </button>
+              )))}
+          </div>
+          <div className="session-preview">
+            {previewLoading ? (
+              <div className="session-muted">Loading preview…</div>
+            ) : !preview ? (
+              <div className="session-muted">{sessions.length > 0 ? "Select a session to preview" : "No sessions to preview."}</div>
+            ) : (
+              <>
+                <div className="session-preview-head">
+                  <div className="session-preview-title">{preview.title || "(untitled)"}</div>
+                  <div className="session-preview-meta">{relativeTime(preview.modifiedMs)} · {preview.messages.length} messages</div>
+                </div>
+                <div className="session-preview-body" ref={previewBodyRef}>
+                  {preview.messages.slice(-30).map((m, i) =>
+                    m.kind === "system" ? (
+                      <div key={i} className="msg msg--sys"><span>system: {m.label}</span></div>
+                    ) : (
+                      <div key={i} className={`msg msg--${m.role}`}>
+                        <span className="msg-role">{m.role}</span>
+                        <div className="msg-text">{m.text}</div>
+                      </div>
+                    )
+                  )}
+                </div>
+                <div className="session-preview-actions">
+                  <button className="picker-primary" onClick={() => project && onPick(project, agentId, preview.id)}>
+                    Resume this session
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -424,6 +590,7 @@ function TerminalView({
   tabId,
   agentId,
   cwd,
+  resumeId,
   visible,
   theme,
   onBell,
@@ -433,6 +600,7 @@ function TerminalView({
   tabId: string;
   agentId: string;
   cwd: string;
+  resumeId?: string;
   visible: boolean;
   theme: ITheme;
   onBell: (tabId: string) => void;
@@ -468,6 +636,24 @@ function TerminalView({
     const sessionId = crypto.randomUUID();
     sessionRef.current = sessionId;
 
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === "keydown" && e.key === "Enter" && e.shiftKey) return false;
+      return true;
+    });
+
+    // Document-capture: intercept Shift+Enter before the webview/xterm handle it
+    // and send ESC+CR (the sequence Claude Code's /terminal-setup maps to multi-line).
+    const onDocKey = (e: KeyboardEvent) => {
+      if (e.type !== "keydown") return;
+      if (e.key !== "Enter" || !e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!wrapRef.current || wrapRef.current.style.display === "none") return;
+      if (!wrapRef.current.contains(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      invoke("write_stdin", { sessionId, data: "\x1b\r" }).catch(() => {});
+    };
+    document.addEventListener("keydown", onDocKey, true);
+
     let unlistenData: UnlistenFn | null = null;
     let unlistenExit: UnlistenFn | null = null;
     let disposed = false;
@@ -481,7 +667,7 @@ function TerminalView({
       const cols = term.cols || 100;
       const rows = term.rows || 30;
       try {
-        await invoke("start_session", { sessionId, agentId, cols, rows, cwd });
+        await invoke("start_session", { sessionId, agentId, cols, rows, cwd, resumeId: resumeId ?? null });
       } catch (err) {
         term.writeln(`\r\n\x1b[31m[failed to start agent: ${err}]\x1b[0m`);
       }
@@ -552,13 +738,14 @@ function TerminalView({
       ro.disconnect();
       if (pollTimer != null) window.clearTimeout(pollTimer);
       window.removeEventListener("focus", onWinFocus);
+      document.removeEventListener("keydown", onDocKey, true);
       unlistenData?.();
       unlistenExit?.();
       if (sessionRef.current) invoke("kill_session", { sessionId: sessionRef.current }).catch(() => {});
       term.dispose();
       termRef.current = null;
     };
-  }, [tabId, agentId, cwd]);
+  }, [tabId, agentId, cwd, resumeId]);
 
   useEffect(() => {
     if (!visible) return;

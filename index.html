@@ -95,6 +95,42 @@
       .recent-path { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 380px; }
       .recent-x { background: transparent; border: none; color: var(--tab-close); font-size: 16px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
       .recent-x:hover { background: var(--border); color: var(--fg); }
+
+      .picker-card--wide { width: 860px; max-width: 100%; padding: 14px 16px 16px; }
+      .picker-head { display: flex; align-items: center; }
+      .picker-head-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+      .picker-head-right select { background: var(--elev); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 24px 4px 10px; font: inherit; font-size: 12px; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8aa0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 8px center; background-size: 12px; cursor: pointer; }
+      .picker-head-right select:hover { background-color: var(--elev-hi); }
+      .picker-head-right select:focus { outline: none; border-color: #ff8a4c; }
+      .picker-head-right .picker-primary { padding: 5px 12px; font-size: 12px; font-weight: 600; align-self: auto; border-radius: 6px; }
+      .session-body { display: grid; grid-template-columns: 320px 1fr; gap: 14px; margin-top: 12px; height: 460px; }
+      .session-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 2px; }
+      .session-new { padding: 8px 12px; background: transparent; color: var(--fg); border: 1px dashed var(--border); border-radius: 8px; font-weight: 500; font-size: 13px; cursor: pointer; text-align: left; transition: border-color .15s, background .15s; }
+      .session-new:hover { border-color: #ff8a4c; background: color-mix(in srgb, #ff8a4c 10%, transparent); color: #ff8a4c; }
+      .session-search { padding: 7px 10px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; outline: none; transition: border-color .15s; }
+      .session-search::placeholder { color: var(--muted); }
+      .session-search:focus { border-color: #ff8a4c; }
+      .session-row { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 10px 12px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--fg); text-align: left; cursor: pointer; font: inherit; transition: background .12s, border-color .12s; }
+      .session-row:hover { background: var(--elev-hi); }
+      .session-row.selected { background: var(--active-bg); border-color: var(--active-border); }
+      .session-title { font-size: 13px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--fg); }
+      .session-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; }
+      .session-preview { border: 1px solid var(--border); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
+      .session-preview-head { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+      .session-preview-title { font-size: 13px; color: var(--fg); }
+      .session-preview-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+      .session-preview-body { flex: 1 1 auto; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+      .session-preview-actions { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+      .msg { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 6px; }
+      .msg--user { background: color-mix(in srgb, var(--active-bg) 50%, transparent); }
+      .msg--assistant { background: transparent; }
+      .msg--sys { padding: 3px 6px; color: var(--muted); font-size: 11px; font-style: italic; opacity: 0.75; }
+      .msg-role { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; color: var(--muted); }
+      .msg--user .msg-role { color: #ff8a4c; }
+      .msg--assistant .msg-role { color: #6a8dff; }
+      .msg-text { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5; color: var(--fg); font-family: "Noto Sans", -apple-system, sans-serif; }
+      .msg--assistant .msg-text { color: color-mix(in srgb, var(--fg) 85%, var(--muted) 15%); }
+      .session-muted { color: var(--muted); padding: 10px 12px; font-size: 12px; }
     </style>
   </head>
   <body>
