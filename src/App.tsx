@@ -7,6 +7,8 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { check as checkUpdate, Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { Terminal, ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -141,6 +143,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [picker, setPicker] = useState<PickerState>({ open: true });
   const [recents, setRecents] = useState<string[]>([]);
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "downloading" | "ready" | "error">("idle");
   const notifReady = useRef(false);
 
   useEffect(() => { document.body.className = theme === "light" ? "theme-light" : "theme-dark"; try { localStorage.setItem("vector.theme", theme); } catch {} }, [theme]);
@@ -158,6 +162,8 @@ export default function App() {
       setDefaultAgent(defAvailable ? def : (firstInstalled ?? "__shell__"));
       setRecents(loadRecents());
       notifReady.current = await ensureNotifPermission();
+      // Background update check — don't block startup.
+      checkUpdate().then((u) => { if (u) setUpdate(u); }).catch(() => {});
     })();
   }, []);
 
@@ -280,8 +286,30 @@ export default function App() {
     </div>
   );
 
+  const installUpdate = async () => {
+    if (!update) return;
+    setUpdateStatus("downloading");
+    try {
+      await update.downloadAndInstall();
+      setUpdateStatus("ready");
+      await relaunch();
+    } catch {
+      setUpdateStatus("error");
+    }
+  };
+
   return (
     <>
+      {update && (
+        <div className="update-banner">
+          <span>Vector {update.version} is available.</span>
+          {updateStatus === "idle" && <button className="update-btn" onClick={installUpdate}>Update & restart</button>}
+          {updateStatus === "downloading" && <span className="update-status">Downloading…</span>}
+          {updateStatus === "ready" && <span className="update-status">Restarting…</span>}
+          {updateStatus === "error" && <button className="update-btn" onClick={installUpdate}>Retry</button>}
+          <button className="icon-btn" onClick={() => setUpdate(null)} aria-label="Dismiss">×</button>
+        </div>
+      )}
       <div className="topbar">
         {activeTab ? (
           <button className="project-btn" onClick={() => openPickerForTab(activeTab.id)} title={activeTab.cwd}>
