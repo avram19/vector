@@ -48,7 +48,7 @@ export function ReposView({
 }) {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
 
   const load = useCallback((force: boolean) => {
