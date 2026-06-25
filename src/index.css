@@ -136,3 +136,22 @@
 .theme-light .pane-shell-panel { background: var(--term-bg, #f5f5f5); }
 .theme-light .pane-shell-header { background: var(--elev, #eee8d5); color: rgba(60, 60, 70, 0.85); border-bottom-color: var(--border, rgba(0, 0, 0, 0.12)); }
 .theme-light .pane-shell-header__close:hover { color: #000; }
+
+/* ── GitHub panel ─────────────────────────────────────────── */
+.gh-empty { padding: 16px; color: var(--muted, rgba(200,200,210,0.75)); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 13px; }
+.gh-empty a { color: #58a6ff; }
+.gh-retry { background: rgba(128,128,128,0.16); border: 0; color: inherit; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.gh-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.gh-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 6px; }
+.gh-who { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.gh-who b { color: var(--fg, #e1e1eb); }
+.gh-av { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg,#3a5f8a,#a371f7); }
+.gh-muted { color: rgba(170,172,190,0.6); }
+.gh-icobtn { width: 24px; height: 24px; border: 0; background: transparent; color: rgba(170,172,190,0.6); border-radius: 6px; cursor: pointer; }
+.gh-icobtn:hover { background: rgba(128,128,128,0.16); color: var(--fg, #e1e1eb); }
+.gh-subtabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border, rgba(128,128,128,0.18)); }
+.gh-subtab { padding: 6px 11px; font-size: 12px; color: rgba(170,172,190,0.6); border: 0; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; }
+.gh-subtab:hover { color: var(--fg, #e1e1eb); }
+.gh-subtab.active { color: var(--fg, #e1e1eb); border-bottom-color: #7aa7e0; }
+.gh-subbody { flex: 1; overflow: auto; min-height: 0; }
+.gh-placeholder { padding: 16px; color: rgba(170,172,190,0.5); font-size: 12px; }
