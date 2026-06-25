@@ -799,6 +799,7 @@ fn main() {
             sidebar::open_in_editor,
             read_agent_cwd,
             github::gh_auth_status,
+            github::list_github_repos,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");
