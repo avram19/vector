@@ -14,6 +14,10 @@ export type SidebarState = {
   show_hidden_files: boolean;
   worktrees_view_mode: WorktreesViewMode;
   github_subview: string;
+  github_custom_groups: string[];
+  github_repo_group: Record<string, string>;
+  github_pinned_repos: string[];
+  github_collapsed_groups: string[];
 };
 
 
@@ -24,6 +28,10 @@ const DEFAULT: SidebarState = {
   show_hidden_files: false,
   worktrees_view_mode: "flat",
   github_subview: "repos",
+  github_custom_groups: [],
+  github_repo_group: {},
+  github_pinned_repos: [],
+  github_collapsed_groups: [],
 };
 
 export function useSidebarState() {
