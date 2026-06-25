@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { ReposView, RepoUpdate } from "./ReposView";
 
 export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
 
 type SubView = "repos" | "prs" | "actions";
+
+export type GithubRepoState = {
+  pinned: string[];
+  customGroups: string[];
+  repoGroup: Record<string, string>;
+  collapsed: string[];
+};
 
 const SUBTABS: { id: SubView; label: string }[] = [
   { id: "repos", label: "Repos" },
@@ -14,9 +22,13 @@ const SUBTABS: { id: SubView; label: string }[] = [
 export function GithubPanel({
   subview,
   onSubview,
+  repoState,
+  onRepoUpdate,
 }: {
   subview: string;
   onSubview: (v: string) => void;
+  repoState: GithubRepoState;
+  onRepoUpdate: (patch: RepoUpdate) => void;
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +90,15 @@ export function GithubPanel({
         ))}
       </div>
       <div className="gh-subbody">
-        {active === "repos" && <div className="gh-placeholder">Repos — coming in Plan 1</div>}
+        {active === "repos" && (
+          <ReposView
+            pinned={repoState.pinned}
+            customGroups={repoState.customGroups}
+            repoGroup={repoState.repoGroup}
+            collapsed={repoState.collapsed}
+            onUpdate={onRepoUpdate}
+          />
+        )}
         {active === "prs" && <div className="gh-placeholder">PR inbox — coming in Plan 2</div>}
         {active === "actions" && <div className="gh-placeholder">Actions — coming in Plan 3</div>}
       </div>

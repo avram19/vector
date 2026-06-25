@@ -171,6 +171,13 @@ export function Sidebar({
               <GithubPanel
                 subview={state.github_subview}
                 onSubview={(v) => update({ github_subview: v })}
+                repoState={{
+                  pinned: state.github_pinned_repos,
+                  customGroups: state.github_custom_groups,
+                  repoGroup: state.github_repo_group,
+                  collapsed: state.github_collapsed_groups,
+                }}
+                onRepoUpdate={(patch) => update(patch)}
               />
             )}
           </div>
