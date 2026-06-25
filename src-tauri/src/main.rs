@@ -3,6 +3,7 @@
 mod config;
 mod fs_watch;
 mod git;
+mod github;
 mod preview;
 mod pty;
 mod sessions;
@@ -20,6 +21,7 @@ struct AppState {
     config: parking_lot::Mutex<config::Config>,
     profiles: parking_lot::Mutex<config::ProfilesFile>,
     ui_config: parking_lot::Mutex<config::UiConfig>,
+    github: github::GithubState,
     watchers: parking_lot::Mutex<std::collections::HashMap<String, fs_watch::WatcherHandle>>,
     session_snapshots: parking_lot::Mutex<std::collections::HashMap<String, worktree_session::Snapshot>>,
     session_manual_pins: parking_lot::Mutex<std::collections::HashMap<String, std::collections::HashSet<std::path::PathBuf>>>,
@@ -769,6 +771,7 @@ fn main() {
             config: parking_lot::Mutex::new(config::load()),
             profiles: parking_lot::Mutex::new(config::load_profiles()),
             ui_config: parking_lot::Mutex::new(config::load_ui_config()),
+            github: github::GithubState::default(),
             watchers: parking_lot::Mutex::new(std::collections::HashMap::new()),
             session_snapshots: parking_lot::Mutex::new(std::collections::HashMap::new()),
             session_manual_pins: parking_lot::Mutex::new(std::collections::HashMap::new()),
@@ -793,6 +796,7 @@ fn main() {
             sidebar::installed_editors,
             sidebar::open_in_editor,
             read_agent_cwd,
+            github::gh_auth_status,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");
