@@ -129,7 +129,7 @@ export function Sidebar({
       {!sidebar_collapsed && (
         <div className="sidebar-panel" style={{ width: sidebar_width }}>
           <div className="sidebar-panel-header">
-            <span className="sidebar-panel-title" title={projectRoot ?? ""}>
+            <span className="sidebar-panel-title" title={sidebar_active_tab === "github" ? "" : (projectRoot ?? "")}>
               {sidebar_active_tab === "github"
                 ? "GitHub"
                 : (projectRoot ? basename(projectRoot) : (sidebar_active_tab === "files" ? "Files" : "Worktrees"))}

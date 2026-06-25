@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
@@ -21,15 +21,15 @@ export function GithubPanel({
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setLoading(true);
     invoke<GhAuthStatus>("gh_auth_status")
       .then(setAuth)
       .catch(() => setAuth({ installed: false, authed: false, login: null }))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(refresh, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
   if (loading && !auth) {
     return <div className="gh-empty">Checking GitHub CLI…</div>;
@@ -54,7 +54,7 @@ export function GithubPanel({
     );
   }
 
-  const active = (SUBTABS.find((t) => t.id === subview)?.id ?? "repos") as SubView;
+  const active: SubView = SUBTABS.find((t) => t.id === subview)?.id ?? "repos";
 
   return (
     <div className="gh-panel">
