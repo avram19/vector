@@ -49,6 +49,7 @@ fn config_path() -> Option<PathBuf> {
 pub enum SidebarTab {
     Files,
     Worktrees,
+    Github,
 }
 
 impl Default for SidebarTab {
@@ -67,6 +68,7 @@ impl Default for WorktreesViewMode {
 }
 
 fn default_sidebar_width() -> u32 { 240 }
+fn default_github_subview() -> String { "repos".to_string() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiConfig {
@@ -80,6 +82,8 @@ pub struct UiConfig {
     pub show_hidden_files: bool,
     #[serde(default)]
     pub worktrees_view_mode: WorktreesViewMode,
+    #[serde(default = "default_github_subview")]
+    pub github_subview: String,
 }
 
 impl Default for UiConfig {
@@ -90,6 +94,7 @@ impl Default for UiConfig {
             sidebar_width: default_sidebar_width(),
             show_hidden_files: false,
             worktrees_view_mode: WorktreesViewMode::default(),
+            github_subview: default_github_subview(),
         }
     }
 }
