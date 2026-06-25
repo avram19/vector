@@ -84,6 +84,14 @@ pub struct UiConfig {
     pub worktrees_view_mode: WorktreesViewMode,
     #[serde(default = "default_github_subview")]
     pub github_subview: String,
+    #[serde(default)]
+    pub github_custom_groups: Vec<String>,
+    #[serde(default)]
+    pub github_repo_group: BTreeMap<String, String>,
+    #[serde(default)]
+    pub github_pinned_repos: Vec<String>,
+    #[serde(default)]
+    pub github_collapsed_groups: Vec<String>,
 }
 
 impl Default for UiConfig {
@@ -95,6 +103,10 @@ impl Default for UiConfig {
             show_hidden_files: false,
             worktrees_view_mode: WorktreesViewMode::default(),
             github_subview: default_github_subview(),
+            github_custom_groups: Vec::new(),
+            github_repo_group: BTreeMap::new(),
+            github_pinned_repos: Vec::new(),
+            github_collapsed_groups: Vec::new(),
         }
     }
 }

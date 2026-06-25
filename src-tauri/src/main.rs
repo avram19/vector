@@ -651,6 +651,10 @@ struct SidebarConfigPatch {
     show_hidden_files: Option<bool>,
     worktrees_view_mode: Option<config::WorktreesViewMode>,
     github_subview: Option<String>,
+    github_custom_groups: Option<Vec<String>>,
+    github_repo_group: Option<std::collections::BTreeMap<String, String>>,
+    github_pinned_repos: Option<Vec<String>>,
+    github_collapsed_groups: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -662,6 +666,10 @@ async fn update_sidebar_config(state: State<'_, AppState>, patch: SidebarConfigP
     if let Some(v) = patch.show_hidden_files { cfg.show_hidden_files = v; }
     if let Some(v) = patch.worktrees_view_mode { cfg.worktrees_view_mode = v; }
     if let Some(v) = patch.github_subview { cfg.github_subview = v; }
+    if let Some(v) = patch.github_custom_groups { cfg.github_custom_groups = v; }
+    if let Some(v) = patch.github_repo_group { cfg.github_repo_group = v; }
+    if let Some(v) = patch.github_pinned_repos { cfg.github_pinned_repos = v; }
+    if let Some(v) = patch.github_collapsed_groups { cfg.github_collapsed_groups = v; }
     config::save_ui_config(&cfg).map_err(|e| e.to_string())
 }
 
