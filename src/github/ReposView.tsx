@@ -263,10 +263,10 @@ export function ReposView({
                     {r.isArchived && <span className="gh-archived">archived</span>}
                     <span
                       className="gh-pin"
-                      style={{ opacity: pinnedSet.has(r.nameWithOwner) ? 1 : 0.25, cursor: "pointer" }}
+                      style={{ cursor: "pointer" }}
                       title={pinnedSet.has(r.nameWithOwner) ? "Unpin" : "Pin"}
                       onClick={(e) => { e.stopPropagation(); togglePin(r.nameWithOwner); }}
-                    >★</span>
+                    >{pinnedSet.has(r.nameWithOwner) ? "★" : "☆"}</span>
                     {r.openPrCount > 0 && <span className="gh-pill">{r.openPrCount} PR{r.openPrCount > 1 ? "s" : ""}</span>}
                     <span className="gh-time">{relTime(r.pushedAt)}</span>
                   </span>
