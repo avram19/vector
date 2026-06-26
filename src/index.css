@@ -222,3 +222,34 @@ body.theme-light {
 .gh-newgrp input { flex: 1; background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; color: var(--gh-fg); padding: 4px 7px; font-size: 12px; outline: 0; }
 .gh-newgrp button { background: var(--gh-hover); border: 0; color: var(--gh-fg); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
 .gh-time { color: var(--gh-dim); font-size: 10px; }
+
+/* ── GitHub PR inbox ──────────────────────────────────────── */
+.gh-prs { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.gh-pr-list { flex: 1; overflow: auto; min-height: 0; padding: 4px 6px 12px; }
+.gh-chip-btn { appearance: none; -webkit-appearance: none; font-size: 11px; color: var(--gh-muted); background: transparent; border: 1px solid var(--gh-border); border-radius: 20px; padding: 2px 9px; cursor: pointer; flex: 0 0 auto; }
+.gh-chip-btn.on { color: #fff; background: #3a5f8a; border-color: #3a5f8a; }
+.gh-pr-bucket { margin-top: 8px; }
+.gh-pr-bucket-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; font-weight: 600; color: var(--gh-fg); cursor: default; }
+.gh-pr-bucket-h.warn { color: #e0913f; }
+.gh-pr-count { margin-left: 4px; color: var(--gh-dim); font-weight: 500; font-size: 11px; }
+.gh-pr-row { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.gh-pr-row:hover { background: var(--gh-row-hover); }
+.gh-pr-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.gh-ci-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.gh-ci-dot.ci-pass { background: #2ea043; }
+.gh-ci-dot.ci-fail { background: #f85149; }
+.gh-ci-dot.ci-run { background: #d9a23a; }
+.gh-ci-dot.ci-none { background: #888; }
+.gh-pr-num { color: var(--gh-faint); font-variant-numeric: tabular-nums; flex: 0 0 auto; font-size: 12px; }
+.gh-pr-title { color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12.5px; }
+.gh-pr-bot { display: flex; align-items: center; gap: 7px; padding-left: 16px; flex-wrap: wrap; }
+.gh-pr-repo { color: var(--gh-muted); font-size: 11px; }
+.gh-pr-spacer { flex: 1 1 auto; }
+.gh-pr-chip { font-size: 10px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--gh-border); color: var(--gh-muted); }
+.gh-pr-chip.conflict { color: #f85149; border-color: rgba(248,81,73,0.4); }
+.gh-pr-chip.req { color: #e0913f; border-color: rgba(224,145,63,0.4); }
+.gh-pr-chip.ok { color: #2ea043; border-color: rgba(46,160,67,0.4); }
+.gh-pr-chip.draft { color: var(--gh-faint); }
+.gh-pr-avatar { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; }
+.gh-pr-avatar--fallback { display: inline-grid; place-items: center; font-size: 8px; font-weight: 700; color: var(--gh-fg); background: var(--gh-hover); }
+.gh-pr-time { color: var(--gh-dim); font-size: 10px; flex: 0 0 auto; }
