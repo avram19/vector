@@ -199,7 +199,7 @@ body.theme-light {
 
 /* ── GitHub repos tree ────────────────────────────────────── */
 .gh-repos { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.gh-search { display: flex; align-items: center; gap: 6px; margin: 8px 10px 4px; padding: 5px 4px; background: transparent; border: 0; color: var(--gh-faint); }
+.gh-search { display: flex; align-items: center; gap: 6px; margin: 4px 0 4px; padding: 4px 12px 8px; background: transparent; border: 0; border-bottom: 1px solid var(--gh-border); color: var(--gh-faint); }
 .gh-search input { flex: 1; border: 0; background: transparent; color: var(--gh-fg); outline: 0; font-size: 12px; }
 .gh-tree { flex: 1; overflow: auto; min-height: 0; padding: 2px 6px 12px; }
 .gh-grp { margin-top: 4px; }
