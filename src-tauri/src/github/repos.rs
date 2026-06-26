@@ -13,9 +13,14 @@ pub struct Repo {
     pub open_pr_count: u32,
 }
 
+// NOTE: `ownerAffiliations` is required, not just `affiliations`. `affiliations`
+// sets the viewer's relationship to a repo, but `ownerAffiliations` controls
+// which owners' repos are included and DEFAULTS to [OWNER, COLLABORATOR] —
+// excluding ORGANIZATION_MEMBER. Without it, org-owned repos are silently
+// dropped (e.g. a member's org repos never appear).
 const QUERY: &str = r#"query($endCursor: String) {
   viewer {
-    repositories(first: 100, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], orderBy: {field: PUSHED_AT, direction: DESC}, after: $endCursor) {
+    repositories(first: 100, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], orderBy: {field: PUSHED_AT, direction: DESC}, after: $endCursor) {
       nodes {
         nameWithOwner
         isPrivate
