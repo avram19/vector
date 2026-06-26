@@ -235,7 +235,7 @@ export function ReposView({
             <div className="gh-grp" key={sec.key}>
               <div
                 className="gh-grp-h"
-                onClick={() => toggleCollapse(sec.key)}
+                onClick={(e) => { if (e.ctrlKey || e.button !== 0) return; toggleCollapse(sec.key); }}
                 onDragOver={sec.key.startsWith("custom:") ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDropTarget(sec.key); } : undefined}
                 onDragLeave={sec.key.startsWith("custom:") ? () => setDropTarget((t) => (t === sec.key ? null : t)) : undefined}
                 onDrop={sec.key.startsWith("custom:") ? (e) => {
