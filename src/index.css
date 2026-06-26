@@ -177,6 +177,7 @@
 .gh-repo-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; color: rgba(170,172,190,0.45); font-size: 11px; flex: 0 0 auto; }
 .gh-pin { color: #d9a23a; }
 .gh-pill { background: #2d3a52; color: #7aa7e0; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px; }
+.gh-archived { font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; color: rgba(170,172,190,0.55); border: 1px solid var(--border, rgba(128,128,128,0.22)); padding: 0 5px; border-radius: 9px; }
 .gh-newgrp { display: flex; gap: 6px; padding: 6px 10px; }
 .gh-newgrp input { flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--border, rgba(128,128,128,0.18)); border-radius: 6px; color: var(--fg, #e1e1eb); padding: 4px 7px; font-size: 12px; outline: 0; }
 .gh-newgrp button { background: rgba(128,128,128,0.16); border: 0; color: inherit; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }

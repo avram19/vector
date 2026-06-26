@@ -6,6 +6,7 @@ export type Repo = {
   nameWithOwner: string;
   owner: string;
   isPrivate: boolean;
+  isArchived: boolean;
   pushedAt: string | null;
   defaultBranch: string | null;
   openPrCount: number;
@@ -78,8 +79,12 @@ export function ReposView({
   const sections: Section[] = useMemo(() => {
     if (!repos) return [];
     const q = filter.trim().toLowerCase();
-    const match = (r: Repo) => !q || r.nameWithOwner.toLowerCase().includes(q);
-    const visible = repos.filter(match);
+    const searching = q.length > 0;
+    // Archived repos are hidden by default and only surface when actively searching.
+    const visible = repos.filter((r) => {
+      if (r.isArchived && !searching) return false;
+      return !q || r.nameWithOwner.toLowerCase().includes(q);
+    });
 
     const favorites = visible.filter((r) => pinnedSet.has(r.nameWithOwner));
     const custom = new Map<string, Repo[]>();
@@ -171,7 +176,7 @@ export function ReposView({
       <div className="gh-search">
         <span className="gh-search-ico">⌕</span>
         <input
-          placeholder="Filter repos…"
+          placeholder="Filter repos (incl. archived)…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -245,6 +250,7 @@ export function ReposView({
                     {r.nameWithOwner.slice(r.owner.length + 1)}
                   </span>
                   <span className="gh-repo-meta">
+                    {r.isArchived && <span className="gh-archived">archived</span>}
                     <span
                       className="gh-pin"
                       style={{ opacity: pinnedSet.has(r.nameWithOwner) ? 1 : 0.25, cursor: "pointer" }}

@@ -8,6 +8,7 @@ pub struct Repo {
     pub name_with_owner: String,
     pub owner: String,
     pub is_private: bool,
+    pub is_archived: bool,
     pub pushed_at: Option<String>,
     pub default_branch: Option<String>,
     pub open_pr_count: u32,
@@ -24,6 +25,7 @@ const QUERY: &str = r#"query($endCursor: String) {
       nodes {
         nameWithOwner
         isPrivate
+        isArchived
         pushedAt
         owner { login }
         defaultBranchRef { name }
@@ -65,6 +67,7 @@ pub fn list_repos() -> Result<Vec<Repo>, String> {
                     name_with_owner: n["nameWithOwner"].as_str().unwrap_or_default().to_string(),
                     owner: n["owner"]["login"].as_str().unwrap_or_default().to_string(),
                     is_private: n["isPrivate"].as_bool().unwrap_or(false),
+                    is_archived: n["isArchived"].as_bool().unwrap_or(false),
                     pushed_at: n["pushedAt"].as_str().map(|s| s.to_string()),
                     default_branch: n["defaultBranchRef"]["name"].as_str().map(|s| s.to_string()),
                     open_pr_count: n["pullRequests"]["totalCount"].as_u64().unwrap_or(0) as u32,
