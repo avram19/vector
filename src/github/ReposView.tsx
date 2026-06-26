@@ -185,7 +185,7 @@ export function ReposView({
       <div className="gh-search">
         <span className="gh-search-ico">⌕</span>
         <input
-          placeholder="Filter repos (incl. archived)…"
+          placeholder="Search repos…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
