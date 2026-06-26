@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileContextMenu } from "../sidebar/contextMenu";
 
@@ -146,6 +146,9 @@ export function ReposView({
   const [menu, setMenu] = useState<{ x: number; y: number; repo: Repo } | null>(null);
   const [groupMenu, setGroupMenu] = useState<{ x: number; y: number; group: string } | null>(null);
   const [overflow, setOverflow] = useState<{ x: number; y: number } | null>(null);
+  // WKWebView fires a `click` right after `contextmenu`; suppress that one click
+  // so right-clicking a row opens the menu without also opening the repo.
+  const suppressClickRef = useRef(false);
 
   const togglePin = (name: string) => {
     const next = pinned.includes(name)
@@ -262,8 +265,16 @@ export function ReposView({
                     e.dataTransfer.effectAllowed = "move";
                     try { e.dataTransfer.setData("text/plain", r.nameWithOwner); } catch { /* webview quirk */ }
                   }}
-                  onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, repo: r }); }}
-                  onClick={() => invoke("open_path", { path: `https://github.com/${r.nameWithOwner}` })}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    suppressClickRef.current = true;
+                    setTimeout(() => { suppressClickRef.current = false; }, 0);
+                    setMenu({ x: e.clientX, y: e.clientY, repo: r });
+                  }}
+                  onClick={() => {
+                    if (suppressClickRef.current) return;
+                    invoke("open_path", { path: `https://github.com/${r.nameWithOwner}` });
+                  }}
                 >
                   <span className="gh-glyph">{r.isPrivate ? "🔒" : "○"}</span>
                   <span className="gh-repo-name">
