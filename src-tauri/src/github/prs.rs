@@ -72,6 +72,14 @@ pub fn list_prs() -> Result<PrInbox, String> {
     let v: serde_json::Value =
         serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
 
+    // GraphQL reports errors (e.g. insufficient token scope, SSO) with HTTP 200
+    // and an `errors` array. Surface them instead of silently returning an empty
+    // inbox.
+    if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
+        let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
+        return Err(msg.to_string());
+    }
+
     let collect = |alias: &str| -> Vec<PullRequest> {
         v["data"][alias]["nodes"]
             .as_array()
