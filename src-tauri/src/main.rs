@@ -809,6 +809,8 @@ fn main() {
             github::gh_auth_status,
             github::list_github_repos,
             github::get_cached_github_repos,
+            github::list_github_prs,
+            github::get_cached_github_prs,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");

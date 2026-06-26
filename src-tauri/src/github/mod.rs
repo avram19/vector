@@ -1,4 +1,5 @@
 pub mod client;
+pub mod prs;
 pub mod repos;
 
 use std::collections::HashMap;
@@ -78,6 +79,55 @@ pub async fn get_cached_github_repos(
     _state: State<'_, AppState>,
 ) -> Result<Vec<repos::Repo>, String> {
     tauri::async_runtime::spawn_blocking(repos::read_disk_cache)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_github_prs(
+    state: State<'_, AppState>,
+    force: bool,
+) -> Result<prs::PrInbox, String> {
+    const TTL: std::time::Duration = std::time::Duration::from_secs(60);
+
+    if !force {
+        let cached = {
+            let cache = state.github.cache.lock();
+            cache.get("prs").and_then(|c| {
+                if c.fetched_at.elapsed() < TTL {
+                    serde_json::from_str::<prs::PrInbox>(&c.body).ok()
+                } else {
+                    None
+                }
+            })
+        };
+        if let Some(hit) = cached {
+            return Ok(hit);
+        }
+    }
+
+    let fresh = tauri::async_runtime::spawn_blocking(prs::list_prs)
+        .await
+        .map_err(|e| e.to_string())??;
+
+    if let Ok(body) = serde_json::to_string(&fresh) {
+        state.github.cache.lock().insert(
+            "prs".to_string(),
+            CachedResponse { etag: None, body, fetched_at: std::time::Instant::now() },
+        );
+    }
+
+    let to_disk = fresh.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || prs::write_disk_cache(&to_disk)).await;
+
+    Ok(fresh)
+}
+
+#[tauri::command]
+pub async fn get_cached_github_prs(
+    _state: State<'_, AppState>,
+) -> Result<prs::PrInbox, String> {
+    tauri::async_runtime::spawn_blocking(prs::read_disk_cache)
         .await
         .map_err(|e| e.to_string())
 }
