@@ -60,18 +60,27 @@ export function ReposView({
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("");
 
   const load = useCallback((force: boolean) => {
-    setLoading(true);
-    setError(null);
+    setRefreshing(true);
     invoke<Repo[]>("list_github_repos", { force })
-      .then((r) => setRepos(r))
+      .then((r) => { setRepos(r); setError(null); })
       .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+      .finally(() => { setRefreshing(false); setLoading(false); });
   }, []);
 
-  useEffect(() => { load(false); }, [load]);
+  useEffect(() => {
+    let alive = true;
+    // Render the disk-cached list instantly, then revalidate in the background
+    // (stale-while-revalidate). list_github_repos persists fresh results to disk.
+    invoke<Repo[]>("get_cached_github_repos")
+      .then((cached) => { if (alive && cached.length) { setRepos(cached); setLoading(false); } })
+      .catch(() => { /* no cache yet */ })
+      .finally(() => { if (alive) load(false); });
+    return () => { alive = false; };
+  }, [load]);
 
   const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
   const collapsedSet = useMemo(() => new Set(collapsed), [collapsed]);
@@ -159,7 +168,7 @@ export function ReposView({
     onUpdate({ github_repo_group: next });
   };
 
-  if (error) {
+  if (error && !repos) {
     return (
       <div className="gh-empty">
         <p><b>Couldn't load repositories</b></p>
@@ -180,6 +189,7 @@ export function ReposView({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        {refreshing && <span className="gh-spin" title="Updating…" />}
         <button
           className="gh-icobtn"
           title="More actions"

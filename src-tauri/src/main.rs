@@ -808,6 +808,7 @@ fn main() {
             read_agent_cwd,
             github::gh_auth_status,
             github::list_github_repos,
+            github::get_cached_github_repos,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");

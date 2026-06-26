@@ -1,6 +1,35 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 use super::client;
+
+/// On-disk cache of the repo list, so the tree can render instantly on startup
+/// while a fresh copy is fetched in the background (stale-while-revalidate).
+/// Lives in the OS cache dir (regenerable data), not config.
+fn cache_path() -> Option<PathBuf> {
+    dirs::cache_dir().map(|d| d.join("vector").join("repos.json"))
+}
+
+pub fn read_disk_cache() -> Vec<Repo> {
+    let Some(p) = cache_path() else { return Vec::new() };
+    let Ok(text) = std::fs::read_to_string(&p) else { return Vec::new() };
+    serde_json::from_str(&text).unwrap_or_default()
+}
+
+pub fn write_disk_cache(repos: &[Repo]) {
+    let Some(p) = cache_path() else { return };
+    if let Some(parent) = p.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(text) = serde_json::to_string(repos) {
+        // Atomic write: tmp + rename, matching config.rs.
+        let tmp = p.with_extension("json.tmp");
+        if std::fs::write(&tmp, text).is_ok() {
+            let _ = std::fs::rename(&tmp, &p);
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

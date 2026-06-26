@@ -62,5 +62,22 @@ pub async fn list_github_repos(
         );
     }
 
+    // Persist to disk so the next app launch can render instantly while a fresh
+    // copy is fetched in the background.
+    let to_disk = fresh.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || repos::write_disk_cache(&to_disk)).await;
+
     Ok(fresh)
+}
+
+/// Return the on-disk cached repo list immediately (no network). Empty if there
+/// is no cache yet. The frontend renders this instantly, then calls
+/// `list_github_repos` to revalidate in the background.
+#[tauri::command]
+pub async fn get_cached_github_repos(
+    _state: State<'_, AppState>,
+) -> Result<Vec<repos::Repo>, String> {
+    tauri::async_runtime::spawn_blocking(repos::read_disk_cache)
+        .await
+        .map_err(|e| e.to_string())
 }
