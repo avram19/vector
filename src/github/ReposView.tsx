@@ -246,7 +246,7 @@ export function ReposView({
                 >
                   <span className="gh-glyph">{r.isPrivate ? "🔒" : "○"}</span>
                   <span className="gh-repo-name">
-                    <span className="gh-own">{r.owner}/</span>
+                    {!sec.key.startsWith("org:") && <span className="gh-own">{r.owner}/</span>}
                     {r.nameWithOwner.slice(r.owner.length + 1)}
                   </span>
                   <span className="gh-repo-meta">

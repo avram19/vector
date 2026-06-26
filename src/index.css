@@ -147,8 +147,9 @@
 .gh-who b { color: var(--fg, #e1e1eb); }
 .gh-av { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg,#3a5f8a,#a371f7); }
 .gh-muted { color: rgba(170,172,190,0.6); }
-.gh-icobtn { width: 24px; height: 24px; border: 0; background: transparent; color: rgba(190,193,210,0.9); border-radius: 6px; cursor: pointer; display: grid; place-items: center; flex: 0 0 auto; }
+.gh-icobtn { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: rgba(190,193,210,0.9); border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 0; flex: 0 0 auto; }
 .gh-icobtn:hover { background: rgba(128,128,128,0.2); color: var(--fg, #e1e1eb); }
+.gh-icobtn svg { display: block; }
 .gh-search-ico { color: rgba(170,172,190,0.6); flex: 0 0 auto; }
 .gh-subtabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border, rgba(128,128,128,0.18)); }
 .gh-subtab { padding: 6px 11px; font-size: 12px; color: rgba(170,172,190,0.6); border: 0; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; }
