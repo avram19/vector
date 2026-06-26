@@ -271,8 +271,9 @@ export function ReposView({
                     setTimeout(() => { suppressClickRef.current = false; }, 0);
                     setMenu({ x: e.clientX, y: e.clientY, repo: r });
                   }}
-                  onClick={() => {
-                    if (suppressClickRef.current) return;
+                  onClick={(e) => {
+                    // Ctrl/right-click is a context-menu gesture, never an "open".
+                    if (e.ctrlKey || e.button !== 0 || suppressClickRef.current) return;
                     invoke("open_path", { path: `https://github.com/${r.nameWithOwner}` });
                   }}
                 >
