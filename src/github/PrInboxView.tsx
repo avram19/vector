@@ -155,13 +155,13 @@ export function PrInboxView({ pinned }: { pinned: string[] }) {
         <Bucket label="👀 Needs my review" prs={buckets.review} />
         <Bucket label="✎ Authored" prs={buckets.authored} />
         <div className="gh-pr-bucket">
-          <div className="gh-pr-bucket-h" onClick={() => setShowClosed((v) => !v)}>
+          <div className="gh-pr-bucket-h" style={{ cursor: "pointer" }} onClick={() => setShowClosed((v) => !v)}>
             <span className="gh-caret">{showClosed ? "▾" : "▸"}</span>
             ✔ Recently merged/closed <span className="gh-pr-count">{buckets.closed.length}</span>
           </div>
           {showClosed && buckets.closed.map((p) => <PrRow key={p.url} pr={p} />)}
         </div>
-        {total === 0 && <div className="gh-placeholder">No open pull requests. 🎉</div>}
+        {total === 0 && buckets.closed.length === 0 && <div className="gh-placeholder">No pull requests. 🎉</div>}
       </div>
     </div>
   );
