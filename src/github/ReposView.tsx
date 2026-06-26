@@ -21,6 +21,15 @@ export type RepoUpdate = {
 
 type Section = { key: string; label: string; tag?: string; star?: boolean; repos: Repo[] };
 
+function SearchIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
 function KebabIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -183,13 +192,15 @@ export function ReposView({
   return (
     <div className="gh-repos" onContextMenu={(e) => e.preventDefault()}>
       <div className="gh-search">
-        <span className="gh-search-ico">⌕</span>
+        <span className="gh-search-ico"><SearchIcon /></span>
         <input
           placeholder="Search repos…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        {refreshing && <span className="gh-spin" title="Updating…" />}
+        {refreshing && (
+          <span className="gh-dots" title="Updating…"><span /><span /><span /></span>
+        )}
         <button
           className="gh-icobtn"
           title="More actions"
