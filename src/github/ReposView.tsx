@@ -20,6 +20,16 @@ export type RepoUpdate = {
 
 type Section = { key: string; label: string; tag?: string; star?: boolean; repos: Repo[] };
 
+function KebabIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  );
+}
+
 function relTime(iso: string | null): string {
   if (!iso) return "";
   const then = new Date(iso).getTime();
@@ -76,8 +86,9 @@ export function ReposView({
     customGroups.forEach((g) => custom.set(g, []));
     const orgs = new Map<string, Repo[]>();
 
+    // Pinned repos appear in Favorites AND still under their custom/org group,
+    // so assigning a favorited repo to a group has a visible effect.
     for (const r of visible) {
-      if (pinnedSet.has(r.nameWithOwner)) continue;
       const g = repoGroup[r.nameWithOwner];
       if (g && custom.has(g)) {
         custom.get(g)!.push(r);
@@ -107,8 +118,11 @@ export function ReposView({
   };
 
   const [newGroup, setNewGroup] = useState("");
+  const [showNewGroup, setShowNewGroup] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; repo: Repo } | null>(null);
+  const [groupMenu, setGroupMenu] = useState<{ x: number; y: number; group: string } | null>(null);
+  const [overflow, setOverflow] = useState<{ x: number; y: number } | null>(null);
 
   const togglePin = (name: string) => {
     const next = pinned.includes(name)
@@ -119,9 +133,19 @@ export function ReposView({
 
   const addGroup = () => {
     const g = newGroup.trim();
-    if (!g || customGroups.includes(g)) { setNewGroup(""); return; }
+    if (!g || customGroups.includes(g)) { setNewGroup(""); setShowNewGroup(false); return; }
     onUpdate({ github_custom_groups: [...customGroups, g] });
     setNewGroup("");
+    setShowNewGroup(false);
+  };
+
+  const deleteGroup = (group: string) => {
+    const nextGroups = customGroups.filter((g) => g !== group);
+    const nextMap: Record<string, string> = {};
+    for (const [repo, g] of Object.entries(repoGroup)) {
+      if (g !== group) nextMap[repo] = g; // repos in the deleted group fall back to their org
+    }
+    onUpdate({ github_custom_groups: nextGroups, github_repo_group: nextMap });
   };
 
   const moveToGroup = (name: string, group: string | null) => {
@@ -143,25 +167,38 @@ export function ReposView({
   if (!repos) return <div className="gh-empty">No repositories.</div>;
 
   return (
-    <div className="gh-repos">
+    <div className="gh-repos" onContextMenu={(e) => e.preventDefault()}>
       <div className="gh-search">
-        <span>⌕</span>
+        <span className="gh-search-ico">⌕</span>
         <input
           placeholder="Filter repos…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <button className="gh-icobtn" title="Refresh" onClick={() => load(true)}>⟳</button>
+        <button
+          className="gh-icobtn"
+          title="More actions"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setOverflow({ x: r.right, y: r.bottom });
+          }}
+        ><KebabIcon /></button>
       </div>
-      <div className="gh-newgrp">
-        <input
-          placeholder="New group…"
-          value={newGroup}
-          onChange={(e) => setNewGroup(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") addGroup(); }}
-        />
-        <button onClick={addGroup}>Add</button>
-      </div>
+      {showNewGroup && (
+        <div className="gh-newgrp">
+          <input
+            autoFocus
+            placeholder="New group name…"
+            value={newGroup}
+            onChange={(e) => setNewGroup(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addGroup();
+              if (e.key === "Escape") { setNewGroup(""); setShowNewGroup(false); }
+            }}
+          />
+          <button onClick={addGroup}>Add</button>
+        </div>
+      )}
       <div className="gh-tree">
         {sections.map((sec) => {
           const isCollapsed = collapsedSet.has(sec.key);
@@ -177,6 +214,11 @@ export function ReposView({
                   const name = e.dataTransfer.getData("text/plain");
                   if (name) moveToGroup(name, sec.label);
                   setDropTarget(null);
+                } : undefined}
+                onContextMenu={sec.key.startsWith("custom:") ? (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setGroupMenu({ x: e.clientX, y: e.clientY, group: sec.label });
                 } : undefined}
                 style={dropTarget === sec.key ? { background: "rgba(58,95,138,0.18)" } : undefined}
               >
@@ -231,6 +273,27 @@ export function ReposView({
             ...customGroups.map((g) => ({ label: `Move to: ${g}`, onClick: () => moveToGroup(menu.repo.nameWithOwner, g) })),
             ...(repoGroup[menu.repo.nameWithOwner] ? [{ label: "Remove from group", onClick: () => moveToGroup(menu.repo.nameWithOwner, null) }] : []),
             { label: "Open on GitHub", onClick: () => invoke("open_path", { path: `https://github.com/${menu.repo.nameWithOwner}` }) },
+          ]}
+        />
+      )}
+      {groupMenu && (
+        <FileContextMenu
+          x={groupMenu.x}
+          y={groupMenu.y}
+          onClose={() => setGroupMenu(null)}
+          items={[
+            { label: `Delete group "${groupMenu.group}"`, onClick: () => deleteGroup(groupMenu.group) },
+          ]}
+        />
+      )}
+      {overflow && (
+        <FileContextMenu
+          x={overflow.x}
+          y={overflow.y}
+          onClose={() => setOverflow(null)}
+          items={[
+            { label: "New group…", onClick: () => setShowNewGroup(true) },
+            { label: "Refresh repos", onClick: () => load(true) },
           ]}
         />
       )}

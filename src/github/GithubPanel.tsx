@@ -19,6 +19,15 @@ const SUBTABS: { id: SubView; label: string }[] = [
   { id: "actions", label: "Actions" },
 ];
 
+function RefreshIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v5h-5" />
+    </svg>
+  );
+}
+
 export function GithubPanel({
   subview,
   onSubview,
@@ -69,14 +78,14 @@ export function GithubPanel({
   const active: SubView = SUBTABS.find((t) => t.id === subview)?.id ?? "repos";
 
   return (
-    <div className="gh-panel">
+    <div className="gh-panel" onContextMenu={(e) => e.preventDefault()}>
       <div className="gh-head">
         <span className="gh-who">
           <span className="gh-av" />
           <b>@{auth.login}</b>
           <span className="gh-muted">· gh authed</span>
         </span>
-        <button className="gh-icobtn" title="Refresh" onClick={refresh}>⟳</button>
+        <button className="gh-icobtn" title="Refresh" onClick={refresh}><RefreshIcon /></button>
       </div>
       <div className="gh-subtabs">
         {SUBTABS.map((t) => (
