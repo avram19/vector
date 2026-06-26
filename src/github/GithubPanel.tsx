@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ReposView, RepoUpdate } from "./ReposView";
+import { PrInboxView } from "./PrInboxView";
 
 export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
 
@@ -108,7 +109,7 @@ export function GithubPanel({
             onUpdate={onRepoUpdate}
           />
         )}
-        {active === "prs" && <div className="gh-placeholder">PR inbox — coming in Plan 2</div>}
+        {active === "prs" && <PrInboxView pinned={repoState.pinned} />}
         {active === "actions" && <div className="gh-placeholder">Actions — coming in Plan 3</div>}
       </div>
     </div>
