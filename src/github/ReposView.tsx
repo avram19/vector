@@ -59,12 +59,14 @@ export function ReposView({
   repoGroup,
   collapsed,
   onUpdate,
+  onOpenPrs,
 }: {
   pinned: string[];
   customGroups: string[];
   repoGroup: Record<string, string>;
   collapsed: string[];
   onUpdate: (patch: RepoUpdate) => void;
+  onOpenPrs: (repo: string) => void;
 }) {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,21 +74,35 @@ export function ReposView({
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("");
 
-  const load = useCallback((force: boolean) => {
+  const load = useCallback(async (force: boolean) => {
     setRefreshing(true);
-    invoke<Repo[]>("list_github_repos", { force })
-      .then((r) => { setRepos(r); setError(null); })
-      .catch((e) => setError(String(e)))
-      .finally(() => { setRefreshing(false); setLoading(false); });
+    setError(null);
+    try {
+      const all: Repo[] = [];
+      let cursor: string | null = null;
+      // First page replaces; subsequent pages append — the view fills in live.
+      do {
+        const page: { repos: Repo[]; nextCursor: string | null } = await invoke(
+          "list_github_repos_page", { cursor }
+        );
+        all.push(...page.repos);
+        setRepos([...all]);
+        cursor = page.nextCursor;
+      } while (cursor);
+      await invoke("set_cached_github_repos", { repos: all }).catch(() => {});
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     let alive = true;
-    // Render the disk-cached list instantly, then revalidate in the background
-    // (stale-while-revalidate). list_github_repos persists fresh results to disk.
     invoke<Repo[]>("get_cached_github_repos")
       .then((cached) => { if (alive && cached.length) { setRepos(cached); setLoading(false); } })
-      .catch(() => { /* no cache yet */ })
+      .catch(() => {})
       .finally(() => { if (alive) load(false); });
     return () => { alive = false; };
   }, [load]);
@@ -290,7 +306,13 @@ export function ReposView({
                       title={pinnedSet.has(r.nameWithOwner) ? "Unpin" : "Pin"}
                       onClick={(e) => { e.stopPropagation(); togglePin(r.nameWithOwner); }}
                     >{pinnedSet.has(r.nameWithOwner) ? "★" : "☆"}</span>
-                    {r.openPrCount > 0 && <span className="gh-pill">{r.openPrCount} PR{r.openPrCount > 1 ? "s" : ""}</span>}
+                    {r.openPrCount > 0 && (
+                      <button
+                        className="gh-pill gh-pill-btn"
+                        title={`Show ${r.openPrCount} open PR${r.openPrCount > 1 ? "s" : ""} for ${r.nameWithOwner}`}
+                        onClick={(e) => { e.stopPropagation(); onOpenPrs(r.nameWithOwner); }}
+                      >{r.openPrCount} PR{r.openPrCount > 1 ? "s" : ""}</button>
+                    )}
                     <span className="gh-time">{relTime(r.pushedAt)}</span>
                   </span>
                 </div>
