@@ -27,6 +27,15 @@ pub struct MyPrs {
     pub recently_closed: Vec<PullRequest>,
 }
 
+/// One page of a paginated PR search: the PRs plus the cursor for the next page
+/// (None when exhausted), so the frontend can offer a "View more" button.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PrPage {
+    pub prs: Vec<PullRequest>,
+    pub next_cursor: Option<String>,
+}
+
 const PR_FRAGMENT: &str = r#"fragment prFields on PullRequest {
   number title url isDraft state headRefName reviewDecision mergeable updatedAt
   repository { nameWithOwner }
@@ -39,8 +48,11 @@ const MY_BODY: &str = r#"query {
   closed: search(query: "is:pr author:@me is:closed sort:updated-desc", type: ISSUE, first: 30) { nodes { ...prFields } }
 }"#;
 
-const TEAM_BODY: &str = r#"query {
-  review: search(query: "is:pr is:open review-requested:@me sort:updated-desc", type: ISSUE, first: 50) { nodes { ...prFields } }
+const TEAM_BODY: &str = r#"query($endCursor: String) {
+  review: search(query: "is:pr is:open review-requested:@me sort:updated-desc", type: ISSUE, first: 50, after: $endCursor) {
+    nodes { ...prFields }
+    pageInfo { hasNextPage endCursor }
+  }
 }"#;
 
 fn parse_pr(n: &serde_json::Value) -> PullRequest {
@@ -63,9 +75,15 @@ fn parse_pr(n: &serde_json::Value) -> PullRequest {
     }
 }
 
-fn run_search(query: &str) -> Result<serde_json::Value, String> {
+fn run_search(query: &str, after: Option<&str>) -> Result<serde_json::Value, String> {
     let q = format!("query={query}");
-    let raw = client::run_gh(&["api", "graphql", "-f", &q])?;
+    let mut args: Vec<String> = vec!["api".into(), "graphql".into(), "-f".into(), q];
+    if let Some(c) = after {
+        args.push("-f".into());
+        args.push(format!("endCursor={c}"));
+    }
+    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let raw = client::run_gh(&arg_refs)?;
     let v: serde_json::Value =
         serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
     // GraphQL reports errors (token scope, SSO) with HTTP 200 + an `errors`
@@ -84,30 +102,40 @@ fn collect(v: &serde_json::Value, alias: &str) -> Vec<PullRequest> {
         .unwrap_or_default()
 }
 
+fn collect_page(v: &serde_json::Value, alias: &str) -> PrPage {
+    let info = &v["data"][alias]["pageInfo"];
+    let next_cursor = if info["hasNextPage"].as_bool().unwrap_or(false) {
+        info["endCursor"].as_str().map(|s| s.to_string())
+    } else {
+        None
+    };
+    PrPage { prs: collect(v, alias), next_cursor }
+}
+
 /// My authored PRs (open) + my recently closed/merged PRs. One round-trip.
 pub fn list_my_prs() -> Result<MyPrs, String> {
-    let v = run_search(&format!("{PR_FRAGMENT}\n{MY_BODY}"))?;
+    let v = run_search(&format!("{PR_FRAGMENT}\n{MY_BODY}"), None)?;
     Ok(MyPrs {
         authored: collect(&v, "authored"),
         recently_closed: collect(&v, "closed"),
     })
 }
 
-/// Open PRs where I'm a requested reviewer. One round-trip.
-pub fn list_team_prs() -> Result<Vec<PullRequest>, String> {
-    let v = run_search(&format!("{PR_FRAGMENT}\n{TEAM_BODY}"))?;
-    Ok(collect(&v, "review"))
+/// One page of open PRs where I'm a requested reviewer.
+pub fn list_team_prs(after: Option<&str>) -> Result<PrPage, String> {
+    let v = run_search(&format!("{PR_FRAGMENT}\n{TEAM_BODY}"), after)?;
+    Ok(collect_page(&v, "review"))
 }
 
-/// All open PRs in a specific repo (regardless of author/reviewer), so a repo's
-/// PR-count badge always reflects real PRs in the inbox. One round-trip.
-pub fn list_repo_prs(repo: &str) -> Result<Vec<PullRequest>, String> {
+/// One page of all open PRs in a specific repo (regardless of author/reviewer),
+/// so a repo's PR-count badge always reflects real PRs in the inbox.
+pub fn list_repo_prs(repo: &str, after: Option<&str>) -> Result<PrPage, String> {
     // `repo` is a GitHub nameWithOwner from our own data; embed it in the search.
     let body = format!(
-        "query {{ search(query: \"repo:{repo} is:pr is:open sort:updated-desc\", type: ISSUE, first: 50) {{ nodes {{ ...prFields }} }} }}"
+        "query($endCursor: String) {{ search(query: \"repo:{repo} is:pr is:open sort:updated-desc\", type: ISSUE, first: 50, after: $endCursor) {{ nodes {{ ...prFields }} pageInfo {{ hasNextPage endCursor }} }} }}"
     );
-    let v = run_search(&format!("{PR_FRAGMENT}\n{body}"))?;
-    Ok(collect(&v, "search"))
+    let v = run_search(&format!("{PR_FRAGMENT}\n{body}"), after)?;
+    Ok(collect_page(&v, "search"))
 }
 
 // ── disk caches (SWR), one file per kind ──

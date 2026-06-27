@@ -236,6 +236,9 @@ body.theme-light {
 .gh-pr-bucket-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; font-weight: 600; color: var(--gh-fg); cursor: default; }
 .gh-pr-bucket-h.warn { color: #e0913f; }
 .gh-pr-count { margin-left: 4px; color: var(--gh-dim); font-weight: 500; font-size: 11px; }
+.gh-viewmore { display: block; width: calc(100% - 16px); margin: 6px 8px 2px; padding: 6px; background: transparent; border: 1px solid var(--gh-border); border-radius: 7px; color: var(--gh-accent); font-size: 12px; cursor: pointer; }
+.gh-viewmore:hover:not(:disabled) { background: var(--gh-row-hover); }
+.gh-viewmore:disabled { color: var(--gh-faint); cursor: default; }
 .gh-pr-row { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
 .gh-pr-row:hover { background: var(--gh-row-hover); }
 .gh-pr-top { display: flex; align-items: center; gap: 7px; min-width: 0; }

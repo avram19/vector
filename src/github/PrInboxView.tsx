@@ -9,6 +9,7 @@ export type PullRequest = {
   mergeable: string; ciStatus: string | null; updatedAt: string;
 };
 type MyPrs = { authored: PullRequest[]; recentlyClosed: PullRequest[] };
+type PrPage = { prs: PullRequest[]; nextCursor: string | null };
 
 function relTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -104,7 +105,11 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
 }) {
   const [mine, setMine] = useState<MyPrs | null>(null);
   const [team, setTeam] = useState<PullRequest[] | null>(null);
+  const [teamCursor, setTeamCursor] = useState<string | null>(null);
+  const [teamMore, setTeamMore] = useState(false);
   const [repoPrs, setRepoPrs] = useState<PullRequest[] | null>(null);
+  const [repoCursor, setRepoCursor] = useState<string | null>(null);
+  const [repoMore, setRepoMore] = useState(false);
   const [repoLoading, setRepoLoading] = useState(false);
   const [allRepos, setAllRepos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -114,12 +119,12 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
 
   const load = useCallback((force: boolean) => {
     setRefreshing(true);
-    // My PRs first (fast), then Team PRs (the big one) — renders in two phases.
+    // My PRs first (fast), then the first page of Team PRs (the big one).
     const p1 = invoke<MyPrs>("list_github_my_prs", { force })
       .then((r) => { setMine(r); setLoading(false); })
       .catch((e) => setError(String(e)));
-    const p2 = invoke<PullRequest[]>("list_github_team_prs", { force })
-      .then((r) => setTeam(r))
+    const p2 = invoke<PrPage>("list_github_team_prs", { after: null })
+      .then((page) => { setTeam(page.prs); setTeamCursor(page.nextCursor); })
       .catch((e) => setError(String(e)));
     Promise.allSettled([p1, p2]).finally(() => setRefreshing(false));
   }, []);
@@ -133,6 +138,15 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
     return () => { alive = false; };
   }, [load]);
 
+  const loadMoreTeam = () => {
+    if (!teamCursor || teamMore) return;
+    setTeamMore(true);
+    invoke<PrPage>("list_github_team_prs", { after: teamCursor })
+      .then((page) => { setTeam((prev) => [...(prev ?? []), ...page.prs]); setTeamCursor(page.nextCursor); })
+      .catch((e) => setError(String(e)))
+      .finally(() => setTeamMore(false));
+  };
+
   // All repos that have open PRs (from the repos cache) — the dropdown source,
   // so any repo whose PR-count badge you click is selectable and shows its PRs.
   useEffect(() => {
@@ -141,18 +155,28 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
       .catch(() => {});
   }, []);
 
-  // When a repo is selected, fetch ALL its open PRs on demand (any author).
+  // When a repo is selected, fetch the first page of its open PRs on demand.
   useEffect(() => {
-    if (!repoFilter) { setRepoPrs(null); return; }
+    if (!repoFilter) { setRepoPrs(null); setRepoCursor(null); return; }
     let alive = true;
     setRepoLoading(true);
     setRepoPrs(null);
-    invoke<PullRequest[]>("list_github_repo_prs", { repo: repoFilter })
-      .then((r) => { if (alive) setRepoPrs(r); })
+    setRepoCursor(null);
+    invoke<PrPage>("list_github_repo_prs", { repo: repoFilter, after: null })
+      .then((page) => { if (alive) { setRepoPrs(page.prs); setRepoCursor(page.nextCursor); } })
       .catch((e) => { if (alive) setError(String(e)); })
       .finally(() => { if (alive) setRepoLoading(false); });
     return () => { alive = false; };
   }, [repoFilter]);
+
+  const loadMoreRepo = () => {
+    if (!repoFilter || !repoCursor || repoMore) return;
+    setRepoMore(true);
+    invoke<PrPage>("list_github_repo_prs", { repo: repoFilter, after: repoCursor })
+      .then((page) => { setRepoPrs((prev) => [...(prev ?? []), ...page.prs]); setRepoCursor(page.nextCursor); })
+      .catch((e) => setError(String(e)))
+      .finally(() => setRepoMore(false));
+  };
 
   const repoOptions = useMemo(() => {
     const set = new Set<string>(allRepos);
@@ -253,10 +277,20 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
             </Section>
             <Section title="Team Pull Requests" count={groups.teamPrs.length} level={0}>
               {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} />) : <div className="gh-placeholder">No pull requests.</div>}
+              {!repoFilter && teamCursor && <ViewMore loading={teamMore} onClick={loadMoreTeam} />}
             </Section>
+            {repoFilter && repoCursor && <ViewMore loading={repoMore} onClick={loadMoreRepo} />}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function ViewMore({ loading, onClick }: { loading: boolean; onClick: () => void }) {
+  return (
+    <button className="gh-viewmore" onClick={onClick} disabled={loading}>
+      {loading ? "Loading…" : "View more"}
+    </button>
   );
 }

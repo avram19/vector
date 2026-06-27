@@ -92,26 +92,19 @@ pub async fn get_cached_github_my_prs(_state: State<'_, AppState>) -> Result<prs
 
 #[tauri::command]
 pub async fn list_github_team_prs(
-    state: State<'_, AppState>,
-    force: bool,
-) -> Result<Vec<prs::PullRequest>, String> {
-    const TTL: std::time::Duration = std::time::Duration::from_secs(60);
-    if !force {
-        let cached = {
-            let cache = state.github.cache.lock();
-            cache.get("team_prs").and_then(|c| {
-                if c.fetched_at.elapsed() < TTL { serde_json::from_str::<Vec<prs::PullRequest>>(&c.body).ok() } else { None }
-            })
-        };
-        if let Some(hit) = cached { return Ok(hit); }
+    _state: State<'_, AppState>,
+    after: Option<String>,
+) -> Result<prs::PrPage, String> {
+    let is_first = after.is_none();
+    let page = tauri::async_runtime::spawn_blocking(move || prs::list_team_prs(after.as_deref()))
+        .await
+        .map_err(|e| e.to_string())??;
+    // Disk-cache only the first page, for instant paint on next launch.
+    if is_first {
+        let to_disk = page.prs.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || prs::write_team_prs_cache(&to_disk)).await;
     }
-    let fresh = tauri::async_runtime::spawn_blocking(prs::list_team_prs).await.map_err(|e| e.to_string())??;
-    if let Ok(body) = serde_json::to_string(&fresh) {
-        state.github.cache.lock().insert("team_prs".to_string(), CachedResponse { etag: None, body, fetched_at: std::time::Instant::now() });
-    }
-    let to_disk = fresh.clone();
-    let _ = tauri::async_runtime::spawn_blocking(move || prs::write_team_prs_cache(&to_disk)).await;
-    Ok(fresh)
+    Ok(page)
 }
 
 #[tauri::command]
@@ -125,8 +118,9 @@ pub async fn get_cached_github_team_prs(_state: State<'_, AppState>) -> Result<V
 pub async fn list_github_repo_prs(
     _state: State<'_, AppState>,
     repo: String,
-) -> Result<Vec<prs::PullRequest>, String> {
-    tauri::async_runtime::spawn_blocking(move || prs::list_repo_prs(&repo))
+    after: Option<String>,
+) -> Result<prs::PrPage, String> {
+    tauri::async_runtime::spawn_blocking(move || prs::list_repo_prs(&repo, after.as_deref()))
         .await
         .map_err(|e| e.to_string())?
 }
