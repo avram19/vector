@@ -16,7 +16,7 @@ export type GithubRepoState = {
 
 const SUBTABS: { id: SubView; label: string }[] = [
   { id: "repos", label: "Repos" },
-  { id: "prs", label: "PRs" },
+  { id: "prs", label: "Pull Requests" },
   { id: "actions", label: "Actions" },
 ];
 
@@ -111,7 +111,7 @@ export function GithubPanel({
             onOpenPrs={(repo) => { setRepoFilter(repo); onSubview("prs"); }}
           />
         )}
-        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} />}
+        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} />}
         {active === "actions" && <div className="gh-placeholder">Actions — coming in Plan 3</div>}
       </div>
     </div>

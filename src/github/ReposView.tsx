@@ -309,7 +309,7 @@ export function ReposView({
                     {r.openPrCount > 0 && (
                       <button
                         className="gh-pill gh-pill-btn"
-                        title={`Show ${r.openPrCount} open PR${r.openPrCount > 1 ? "s" : ""} for ${r.nameWithOwner}`}
+                        title={`Show ${r.openPrCount} open pull request${r.openPrCount > 1 ? "s" : ""} for ${r.nameWithOwner}`}
                         onClick={(e) => { e.stopPropagation(); onOpenPrs(r.nameWithOwner); }}
                       >{r.openPrCount} PR{r.openPrCount > 1 ? "s" : ""}</button>
                     )}

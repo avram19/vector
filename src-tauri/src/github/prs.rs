@@ -27,24 +27,19 @@ pub struct MyPrs {
     pub recently_closed: Vec<PullRequest>,
 }
 
-const MY_QUERY: &str = r#"fragment prFields on PullRequest {
+const PR_FRAGMENT: &str = r#"fragment prFields on PullRequest {
   number title url isDraft state headRefName reviewDecision mergeable updatedAt
   repository { nameWithOwner }
   author { login avatarUrl }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
-}
-query {
+}"#;
+
+const MY_BODY: &str = r#"query {
   authored: search(query: "is:pr is:open author:@me sort:updated-desc", type: ISSUE, first: 50) { nodes { ...prFields } }
   closed: search(query: "is:pr author:@me is:closed sort:updated-desc", type: ISSUE, first: 30) { nodes { ...prFields } }
 }"#;
 
-const TEAM_QUERY: &str = r#"fragment prFields on PullRequest {
-  number title url isDraft state headRefName reviewDecision mergeable updatedAt
-  repository { nameWithOwner }
-  author { login avatarUrl }
-  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
-}
-query {
+const TEAM_BODY: &str = r#"query {
   review: search(query: "is:pr is:open review-requested:@me sort:updated-desc", type: ISSUE, first: 50) { nodes { ...prFields } }
 }"#;
 
@@ -91,7 +86,7 @@ fn collect(v: &serde_json::Value, alias: &str) -> Vec<PullRequest> {
 
 /// My authored PRs (open) + my recently closed/merged PRs. One round-trip.
 pub fn list_my_prs() -> Result<MyPrs, String> {
-    let v = run_search(MY_QUERY)?;
+    let v = run_search(&format!("{PR_FRAGMENT}\n{MY_BODY}"))?;
     Ok(MyPrs {
         authored: collect(&v, "authored"),
         recently_closed: collect(&v, "closed"),
@@ -100,8 +95,19 @@ pub fn list_my_prs() -> Result<MyPrs, String> {
 
 /// Open PRs where I'm a requested reviewer. One round-trip.
 pub fn list_team_prs() -> Result<Vec<PullRequest>, String> {
-    let v = run_search(TEAM_QUERY)?;
+    let v = run_search(&format!("{PR_FRAGMENT}\n{TEAM_BODY}"))?;
     Ok(collect(&v, "review"))
+}
+
+/// All open PRs in a specific repo (regardless of author/reviewer), so a repo's
+/// PR-count badge always reflects real PRs in the inbox. One round-trip.
+pub fn list_repo_prs(repo: &str) -> Result<Vec<PullRequest>, String> {
+    // `repo` is a GitHub nameWithOwner from our own data; embed it in the search.
+    let body = format!(
+        "query {{ search(query: \"repo:{repo} is:pr is:open sort:updated-desc\", type: ISSUE, first: 50) {{ nodes {{ ...prFields }} }} }}"
+    );
+    let v = run_search(&format!("{PR_FRAGMENT}\n{body}"))?;
+    Ok(collect(&v, "search"))
 }
 
 // ── disk caches (SWR), one file per kind ──

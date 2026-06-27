@@ -118,3 +118,15 @@ pub async fn list_github_team_prs(
 pub async fn get_cached_github_team_prs(_state: State<'_, AppState>) -> Result<Vec<prs::PullRequest>, String> {
     tauri::async_runtime::spawn_blocking(prs::read_team_prs_cache).await.map_err(|e| e.to_string())
 }
+
+/// All open PRs in one repo (any author) — used when the inbox is filtered to a
+/// specific repo, so a repo's PR-count badge always shows real PRs.
+#[tauri::command]
+pub async fn list_github_repo_prs(
+    _state: State<'_, AppState>,
+    repo: String,
+) -> Result<Vec<prs::PullRequest>, String> {
+    tauri::async_runtime::spawn_blocking(move || prs::list_repo_prs(&repo))
+        .await
+        .map_err(|e| e.to_string())?
+}

@@ -96,12 +96,16 @@ function RefreshIcon() {
   );
 }
 
-export function PrInboxView({ repoFilter, onRepoFilter }: {
+export function PrInboxView({ repoFilter, onRepoFilter, login }: {
   repoFilter: string | null;
   onRepoFilter: (r: string | null) => void;
+  login: string;
 }) {
   const [mine, setMine] = useState<MyPrs | null>(null);
   const [team, setTeam] = useState<PullRequest[] | null>(null);
+  const [repoPrs, setRepoPrs] = useState<PullRequest[] | null>(null);
+  const [repoLoading, setRepoLoading] = useState(false);
+  const [allRepos, setAllRepos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,49 +132,80 @@ export function PrInboxView({ repoFilter, onRepoFilter }: {
     return () => { alive = false; };
   }, [load]);
 
-  // Repos present across all fetched PRs, for the dropdown.
+  // All repos that have open PRs (from the repos cache) — the dropdown source,
+  // so any repo whose PR-count badge you click is selectable and shows its PRs.
+  useEffect(() => {
+    invoke<{ nameWithOwner: string; openPrCount: number }[]>("get_cached_github_repos")
+      .then((repos) => setAllRepos(repos.filter((r) => r.openPrCount > 0).map((r) => r.nameWithOwner)))
+      .catch(() => {});
+  }, []);
+
+  // When a repo is selected, fetch ALL its open PRs on demand (any author).
+  useEffect(() => {
+    if (!repoFilter) { setRepoPrs(null); return; }
+    let alive = true;
+    setRepoLoading(true);
+    setRepoPrs(null);
+    invoke<PullRequest[]>("list_github_repo_prs", { repo: repoFilter })
+      .then((r) => { if (alive) setRepoPrs(r); })
+      .catch((e) => { if (alive) setError(String(e)); })
+      .finally(() => { if (alive) setRepoLoading(false); });
+    return () => { alive = false; };
+  }, [repoFilter]);
+
   const repoOptions = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(allRepos);
     (mine?.authored ?? []).forEach((p) => set.add(p.repo));
     (mine?.recentlyClosed ?? []).forEach((p) => set.add(p.repo));
     (team ?? []).forEach((p) => set.add(p.repo));
+    if (repoFilter) set.add(repoFilter);
     return [...set].sort();
-  }, [mine, team]);
+  }, [allRepos, mine, team, repoFilter]);
 
   const match = useCallback((p: PullRequest) => {
-    const q = filter.trim().toLowerCase();
-    return (!repoFilter || p.repo === repoFilter)
-      && (!q || p.title.toLowerCase().includes(q) || p.repo.toLowerCase().includes(q));
-  }, [filter, repoFilter]);
+    const q = filter.trim().toLowerCase().replace(/^#/, "");
+    if (!q) return true;
+    return p.title.toLowerCase().includes(q)
+      || p.repo.toLowerCase().includes(q)
+      || String(p.number).includes(q);
+  }, [filter]);
 
   const groups = useMemo(() => {
-    const authored = (mine?.authored ?? []).filter(match);
     const weekAgo = Date.now() - 7 * 86400_000;
+    if (repoFilter) {
+      // Repo mode: all open PRs in the repo, split by authorship.
+      const prs = (repoPrs ?? []).filter(match);
+      const authored = prs.filter((p) => p.author === login);
+      const teamPrs = prs.filter((p) => p.author !== login);
+      return {
+        action: authored.filter(needsAction),
+        ready: authored.filter((p) => !needsAction(p) && readyToMerge(p)),
+        waiting: authored.filter((p) => !needsAction(p) && !readyToMerge(p)),
+        done: [] as PullRequest[],
+        teamPrs,
+      };
+    }
+    const authored = (mine?.authored ?? []).filter(match);
     const done = (mine?.recentlyClosed ?? []).filter((p) => match(p) && new Date(p.updatedAt).getTime() >= weekAgo);
-    const action = authored.filter(needsAction);
-    const ready = authored.filter((p) => !needsAction(p) && readyToMerge(p));
-    const waiting = authored.filter((p) => !needsAction(p) && !readyToMerge(p));
-    const teamPrs = (team ?? []).filter(match);
-    return { action, ready, waiting, done, teamPrs };
-  }, [mine, team, match]);
-
-  if (error && !mine && !team) {
-    return (
-      <div className="gh-empty">
-        <p><b>Couldn't load pull requests</b></p>
-        <p className="gh-muted">{error}</p>
-        <button className="gh-retry" onClick={() => load(true)}>Retry</button>
-      </div>
-    );
-  }
-  if (!mine && !team && loading) return <div className="gh-empty">Loading pull requests…</div>;
+    return {
+      action: authored.filter(needsAction),
+      ready: authored.filter((p) => !needsAction(p) && readyToMerge(p)),
+      waiting: authored.filter((p) => !needsAction(p) && !readyToMerge(p)),
+      done,
+      teamPrs: (team ?? []).filter(match),
+    };
+  }, [repoFilter, repoPrs, mine, team, match, login]);
 
   const myTotal = groups.action.length + groups.ready.length + groups.waiting.length + groups.done.length;
+  const nothingLoaded = !mine && !team && !repoPrs;
+  const isLoading = repoFilter ? repoLoading : loading;
 
-  return (
-    <div className="gh-prs">
+  // A plain JSX element (NOT a nested component) so the search input keeps focus
+  // across re-renders. Reused by both the error and normal returns.
+  const chrome = (
+    <>
       <div className="gh-search">
-        <input placeholder="Search PRs…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input placeholder="Search Pull Requests…" value={filter} onChange={(e) => setFilter(e.target.value)} />
         {refreshing && <span className="gh-dots" title="Updating…"><span /><span /><span /></span>}
         <button className="gh-icobtn" title="Refresh" onClick={() => load(true)}><RefreshIcon /></button>
       </div>
@@ -179,18 +214,46 @@ export function PrInboxView({ repoFilter, onRepoFilter }: {
           <option value="">All repos</option>
           {repoOptions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
+        {repoFilter && (
+          <button className="gh-icobtn" title="Clear repo filter" onClick={() => onRepoFilter(null)}>✕</button>
+        )}
       </div>
+    </>
+  );
+
+  if (error && nothingLoaded) {
+    return (
+      <div className="gh-prs">
+        {chrome}
+        <div className="gh-empty">
+          <p><b>Couldn't load pull requests</b></p>
+          <p className="gh-muted">{error}</p>
+          <button className="gh-retry" onClick={() => load(true)}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="gh-prs">
+      {chrome}
       <div className="gh-pr-list">
-        <Section title="My PRs" count={myTotal} level={0}>
-          {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-          {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-          {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-          {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-          {myTotal === 0 && <div className="gh-placeholder">Nothing here. 🎉</div>}
-        </Section>
-        <Section title="Team PRs" count={groups.teamPrs.length} level={0}>
-          {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} />) : <div className="gh-placeholder">No review requests.</div>}
-        </Section>
+        {isLoading && nothingLoaded ? (
+          <div className="gh-placeholder">Loading pull requests…</div>
+        ) : (
+          <>
+            <Section title="My Pull Requests" count={myTotal} level={0}>
+              {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+              {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+              {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+              {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+              {myTotal === 0 && <div className="gh-placeholder">Nothing here. 🎉</div>}
+            </Section>
+            <Section title="Team Pull Requests" count={groups.teamPrs.length} level={0}>
+              {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} />) : <div className="gh-placeholder">No pull requests.</div>}
+            </Section>
+          </>
+        )}
       </div>
     </div>
   );
