@@ -212,9 +212,6 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
       </div>
       <div className="gh-pr-repofilter">
         <RepoFilterDropdown value={repoFilter} options={repoOptions} onChange={onRepoFilter} />
-        {repoFilter && (
-          <button className="gh-icobtn" title="Clear repo filter" onClick={() => onRepoFilter(null)}>✕</button>
-        )}
       </div>
     </>
   );
