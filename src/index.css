@@ -219,7 +219,7 @@ body.theme-light {
 .gh-repo-name { color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .gh-own { color: var(--gh-muted); }
 .gh-repo-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--gh-faint); font-size: 11px; flex: 0 0 auto; }
-.gh-pin { color: var(--gh-star); }
+.gh-pin { color: var(--gh-star); cursor: pointer; flex: 0 0 auto; }
 .gh-pill { background: var(--gh-pill-bg); color: var(--gh-pill-fg); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px; }
 .gh-archived { font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--gh-faint); border: 1px solid var(--gh-border); padding: 0 5px; border-radius: 9px; }
 .gh-newgrp { display: flex; gap: 6px; padding: 6px 10px; }

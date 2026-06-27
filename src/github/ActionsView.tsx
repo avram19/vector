@@ -89,7 +89,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview }: {
   const openLog = (run: Run, job: Job) => {
     invoke<string>("get_github_job_log", { repo: run.repo, jobId: job.id })
       .then((path) => onOpenPreview(path, undefined, undefined, { pin: false }))
-      .catch((e) => setError(`Log not available yet: ${e}`));
+      .catch((e) => setError(`Failed to load log: ${e}`));
   };
 
   const isFav = (repo: string, path: string) => favorites.includes(favKey(repo, path));
