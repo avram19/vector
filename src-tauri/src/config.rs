@@ -92,6 +92,8 @@ pub struct UiConfig {
     pub github_pinned_repos: Vec<String>,
     #[serde(default)]
     pub github_collapsed_groups: Vec<String>,
+    #[serde(default)]
+    pub github_favorited_workflows: Vec<String>,
 }
 
 impl Default for UiConfig {
@@ -107,6 +109,7 @@ impl Default for UiConfig {
             github_repo_group: BTreeMap::new(),
             github_pinned_repos: Vec::new(),
             github_collapsed_groups: Vec::new(),
+            github_favorited_workflows: Vec::new(),
         }
     }
 }
