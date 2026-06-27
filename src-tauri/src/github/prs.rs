@@ -115,7 +115,7 @@ fn read_json<T: serde::de::DeserializeOwned + Default>(name: &str) -> T {
     serde_json::from_str(&text).unwrap_or_default()
 }
 
-fn write_json<T: Serialize>(name: &str, val: &T) {
+fn write_json<T: Serialize + ?Sized>(name: &str, val: &T) {
     let Some(p) = cache_file(name) else { return };
     if let Some(parent) = p.parent() {
         let _ = std::fs::create_dir_all(parent);
