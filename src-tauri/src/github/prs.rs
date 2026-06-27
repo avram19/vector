@@ -131,4 +131,4 @@ fn write_json<T: Serialize>(name: &str, val: &T) {
 pub fn read_my_prs_cache() -> MyPrs { read_json("my-prs.json") }
 pub fn write_my_prs_cache(v: &MyPrs) { write_json("my-prs.json", v) }
 pub fn read_team_prs_cache() -> Vec<PullRequest> { read_json("team-prs.json") }
-pub fn write_team_prs_cache(v: &[PullRequest]) { write_json("team-prs.json", &v.to_vec()) }
+pub fn write_team_prs_cache(v: &[PullRequest]) { write_json("team-prs.json", v) }
