@@ -287,3 +287,34 @@ body.theme-light {
 .gh-pr-section.level-1 > .gh-pr-section-body { padding-left: 8px; }
 .gh-pr-chip.merged { color: #a371f7; border-color: rgba(163,113,247,0.4); }
 .gh-pr-chip.closed { color: var(--gh-faint); border-color: var(--gh-border); }
+
+/* ── GitHub Actions ───────────────────────────────────────── */
+.gh-actions { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: auto; padding-bottom: 12px; }
+.gh-actions-err { margin: 6px 10px; padding: 6px 8px; font-size: 11px; color: #f85149; border: 1px solid rgba(248,81,73,0.4); border-radius: 6px; cursor: pointer; }
+.gh-act-section { margin-top: 8px; }
+.gh-act-h { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--gh-muted); }
+.gh-run { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; cursor: pointer; }
+.gh-run:hover { background: var(--gh-row-hover); }
+.gh-run-wrap { padding-left: 14px; }
+.gh-run-main { min-width: 0; flex: 1; }
+.gh-run-l1 { display: flex; gap: 6px; align-items: baseline; color: var(--gh-fg); font-size: 12.5px; }
+.gh-run-wf { font-weight: 600; }
+.gh-run-n { color: var(--gh-faint); font-size: 11px; }
+.gh-run-l2 { color: var(--gh-faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-run-repo { color: var(--gh-muted); }
+.gh-run-branch { color: var(--gh-accent); }
+.gh-run-ico { flex: 0 0 auto; width: 14px; text-align: center; font-size: 12px; }
+.gh-run-ico.ok { color: #2ea043; }
+.gh-run-ico.bad { color: #f85149; }
+.gh-run-ico.dim { color: var(--gh-faint); }
+.gh-run-spin { flex: 0 0 auto; width: 11px; height: 11px; border: 2px solid var(--gh-border); border-top-color: var(--gh-accent); border-radius: 50%; animation: gh-spin 0.8s linear infinite; }
+@keyframes gh-spin { to { transform: rotate(360deg); } }
+.gh-wf { margin: 0 4px; }
+.gh-wf-h { display: flex; align-items: center; gap: 6px; padding: 6px 6px; border-radius: 7px; cursor: pointer; }
+.gh-wf-h:hover { background: var(--gh-row-hover); }
+.gh-wf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gh-fg); font-size: 12.5px; }
+.gh-job { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 28px; font-size: 12px; color: var(--gh-muted); }
+.gh-job-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-job-log { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-accent); border-radius: 6px; padding: 1px 8px; font-size: 11px; cursor: pointer; flex: 0 0 auto; }
+.gh-job-log:hover { background: var(--gh-row-hover); }
+.gh-job-running { color: var(--gh-faint); font-size: 11px; flex: 0 0 auto; }
