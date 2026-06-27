@@ -2,24 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export type PullRequest = {
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  author: string;
-  authorAvatar: string | null;
-  headRef: string;
-  isDraft: boolean;
-  state: string;
-  reviewDecision: string | null;
-  mergeable: string;
-  ciStatus: string | null;
-  updatedAt: string;
+  repo: string; number: number; title: string; url: string;
+  author: string; authorAvatar: string | null; headRef: string;
+  isDraft: boolean; state: string; reviewDecision: string | null;
+  mergeable: string; ciStatus: string | null; updatedAt: string;
 };
-
-export type PrInbox = { authored: PullRequest[]; review: PullRequest[]; recentlyClosed: PullRequest[] };
-
-const EMPTY: PrInbox = { authored: [], review: [], recentlyClosed: [] };
+type MyPrs = { authored: PullRequest[]; recentlyClosed: PullRequest[] };
 
 function relTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -31,20 +19,18 @@ function relTime(iso: string): string {
   const d = h / 24; if (d < 7) return `${Math.floor(d)}d`;
   return `${Math.floor(d / 7)}w`;
 }
-
 function ciClass(ci: string | null): string {
   if (ci === "SUCCESS") return "ci-pass";
   if (ci === "FAILURE" || ci === "ERROR") return "ci-fail";
   if (ci === "PENDING" || ci === "EXPECTED") return "ci-run";
   return "ci-none";
 }
-
-function needsAttention(p: PullRequest): boolean {
-  return p.reviewDecision === "CHANGES_REQUESTED"
-    || p.ciStatus === "FAILURE" || p.ciStatus === "ERROR"
-    || p.mergeable === "CONFLICTING";
+function needsAction(p: PullRequest): boolean {
+  return p.reviewDecision === "CHANGES_REQUESTED" || p.ciStatus === "FAILURE" || p.ciStatus === "ERROR" || p.mergeable === "CONFLICTING";
 }
-
+function readyToMerge(p: PullRequest): boolean {
+  return p.reviewDecision === "APPROVED" && p.mergeable === "MERGEABLE" && (p.ciStatus === "SUCCESS" || p.ciStatus === null) && !p.isDraft;
+}
 function initials(login: string): string {
   return login.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
 }
@@ -59,12 +45,15 @@ function Avatar({ pr }: { pr: PullRequest }) {
 
 function PrRow({ pr }: { pr: PullRequest }) {
   const chips: { label: string; cls: string }[] = [];
-  if (pr.mergeable === "CONFLICTING") chips.push({ label: "merge conflict", cls: "conflict" });
-  if (pr.ciStatus === "FAILURE" || pr.ciStatus === "ERROR") chips.push({ label: "CI failed", cls: "conflict" });
-  if (pr.reviewDecision === "CHANGES_REQUESTED") chips.push({ label: "changes requested", cls: "req" });
-  if (pr.reviewDecision === "APPROVED") chips.push({ label: "approved", cls: "ok" });
-  if (pr.isDraft) chips.push({ label: "draft", cls: "draft" });
-
+  if (pr.state === "MERGED") chips.push({ label: "Merged", cls: "merged" });
+  else if (pr.state === "CLOSED") chips.push({ label: "Closed", cls: "closed" });
+  else {
+    if (pr.mergeable === "CONFLICTING") chips.push({ label: "merge conflict", cls: "conflict" });
+    if (pr.ciStatus === "FAILURE" || pr.ciStatus === "ERROR") chips.push({ label: "CI failed", cls: "conflict" });
+    if (pr.reviewDecision === "CHANGES_REQUESTED") chips.push({ label: "changes requested", cls: "req" });
+    if (pr.reviewDecision === "APPROVED") chips.push({ label: "approved", cls: "ok" });
+    if (pr.isDraft) chips.push({ label: "draft", cls: "draft" });
+  }
   return (
     <div className="gh-pr-row" onClick={() => invoke("open_path", { path: pr.url })} title={pr.title}>
       <div className="gh-pr-top">
@@ -83,53 +72,89 @@ function PrRow({ pr }: { pr: PullRequest }) {
   );
 }
 
-export function PrInboxView({ pinned }: { pinned: string[] }) {
-  const [inbox, setInbox] = useState<PrInbox | null>(null);
+function Section({ title, count, children, defaultOpen = true, level = 0 }: {
+  title: string; count: number; children: React.ReactNode; defaultOpen?: boolean; level?: number;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`gh-pr-section level-${level}`}>
+      <div className="gh-pr-section-h" onClick={() => setOpen((v) => !v)}>
+        <span className="gh-caret">{open ? "▾" : "▸"}</span>
+        <span className="gh-pr-section-title">{title}</span>
+        <span className="gh-pr-count">{count}</span>
+      </div>
+      {open && <div className="gh-pr-section-body">{children}</div>}
+    </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v5h-5" />
+    </svg>
+  );
+}
+
+export function PrInboxView({ repoFilter, onRepoFilter }: {
+  repoFilter: string | null;
+  onRepoFilter: (r: string | null) => void;
+}) {
+  const [mine, setMine] = useState<MyPrs | null>(null);
+  const [team, setTeam] = useState<PullRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("");
-  const [pinnedOnly, setPinnedOnly] = useState(false);
-  const [showClosed, setShowClosed] = useState(false);
 
   const load = useCallback((force: boolean) => {
     setRefreshing(true);
-    invoke<PrInbox>("list_github_prs", { force })
-      .then((r) => { setInbox(r); setError(null); })
-      .catch((e) => setError(String(e)))
-      .finally(() => { setRefreshing(false); setLoading(false); });
+    // My PRs first (fast), then Team PRs (the big one) — renders in two phases.
+    const p1 = invoke<MyPrs>("list_github_my_prs", { force })
+      .then((r) => { setMine(r); setLoading(false); })
+      .catch((e) => setError(String(e)));
+    const p2 = invoke<PullRequest[]>("list_github_team_prs", { force })
+      .then((r) => setTeam(r))
+      .catch((e) => setError(String(e)));
+    Promise.allSettled([p1, p2]).finally(() => setRefreshing(false));
   }, []);
 
   useEffect(() => {
     let alive = true;
-    invoke<PrInbox>("get_cached_github_prs")
-      .then((cached) => {
-        const any = cached.authored.length || cached.review.length || cached.recentlyClosed.length;
-        if (alive && any) { setInbox(cached); setLoading(false); }
-      })
-      .catch(() => {})
-      .finally(() => { if (alive) load(false); });
+    Promise.allSettled([
+      invoke<MyPrs>("get_cached_github_my_prs").then((c) => { if (alive && (c.authored.length || c.recentlyClosed.length)) { setMine(c); setLoading(false); } }),
+      invoke<PullRequest[]>("get_cached_github_team_prs").then((c) => { if (alive && c.length) setTeam(c); }),
+    ]).finally(() => { if (alive) load(false); });
     return () => { alive = false; };
   }, [load]);
 
-  const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
+  // Repos present across all fetched PRs, for the dropdown.
+  const repoOptions = useMemo(() => {
+    const set = new Set<string>();
+    (mine?.authored ?? []).forEach((p) => set.add(p.repo));
+    (mine?.recentlyClosed ?? []).forEach((p) => set.add(p.repo));
+    (team ?? []).forEach((p) => set.add(p.repo));
+    return [...set].sort();
+  }, [mine, team]);
 
-  const buckets = useMemo(() => {
-    const data = inbox ?? EMPTY;
+  const match = useCallback((p: PullRequest) => {
     const q = filter.trim().toLowerCase();
-    const visible = (p: PullRequest) =>
-      (!pinnedOnly || pinnedSet.has(p.repo)) &&
-      (!q || p.title.toLowerCase().includes(q) || p.repo.toLowerCase().includes(q));
+    return (!repoFilter || p.repo === repoFilter)
+      && (!q || p.title.toLowerCase().includes(q) || p.repo.toLowerCase().includes(q));
+  }, [filter, repoFilter]);
 
-    const attention = data.authored.filter((p) => needsAttention(p) && visible(p));
-    const authored = data.authored.filter((p) => !needsAttention(p) && visible(p));
-    const review = data.review.filter(visible);
+  const groups = useMemo(() => {
+    const authored = (mine?.authored ?? []).filter(match);
     const weekAgo = Date.now() - 7 * 86400_000;
-    const closed = data.recentlyClosed.filter((p) => visible(p) && new Date(p.updatedAt).getTime() >= weekAgo);
-    return { attention, review, authored, closed };
-  }, [inbox, filter, pinnedOnly, pinnedSet]);
+    const done = (mine?.recentlyClosed ?? []).filter((p) => match(p) && new Date(p.updatedAt).getTime() >= weekAgo);
+    const action = authored.filter(needsAction);
+    const ready = authored.filter((p) => !needsAction(p) && readyToMerge(p));
+    const waiting = authored.filter((p) => !needsAction(p) && !readyToMerge(p));
+    const teamPrs = (team ?? []).filter(match);
+    return { action, ready, waiting, done, teamPrs };
+  }, [mine, team, match]);
 
-  if (error && !inbox) {
+  if (error && !mine && !team) {
     return (
       <div className="gh-empty">
         <p><b>Couldn't load pull requests</b></p>
@@ -138,52 +163,35 @@ export function PrInboxView({ pinned }: { pinned: string[] }) {
       </div>
     );
   }
-  if (!inbox && loading) return <div className="gh-empty">Loading pull requests…</div>;
+  if (!mine && !team && loading) return <div className="gh-empty">Loading pull requests…</div>;
 
-  const total = buckets.attention.length + buckets.review.length + buckets.authored.length;
+  const myTotal = groups.action.length + groups.ready.length + groups.waiting.length + groups.done.length;
 
   return (
     <div className="gh-prs">
       <div className="gh-search">
         <input placeholder="Search PRs…" value={filter} onChange={(e) => setFilter(e.target.value)} />
         {refreshing && <span className="gh-dots" title="Updating…"><span /><span /><span /></span>}
-        <button className={`gh-chip-btn${pinnedOnly ? " on" : ""}`} onClick={() => setPinnedOnly((v) => !v)} title="Only pinned repos">Pinned</button>
         <button className="gh-icobtn" title="Refresh" onClick={() => load(true)}><RefreshIcon /></button>
       </div>
+      <div className="gh-pr-repofilter">
+        <select value={repoFilter ?? ""} onChange={(e) => onRepoFilter(e.target.value || null)}>
+          <option value="">All repos</option>
+          {repoOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
       <div className="gh-pr-list">
-        <Bucket label="⚠ Needs attention" tone="warn" prs={buckets.attention} />
-        <Bucket label="👀 Needs my review" prs={buckets.review} />
-        <Bucket label="✎ Authored" prs={buckets.authored} />
-        <div className="gh-pr-bucket">
-          <div className="gh-pr-bucket-h" style={{ cursor: "pointer" }} onClick={() => setShowClosed((v) => !v)}>
-            <span className="gh-caret">{showClosed ? "▾" : "▸"}</span>
-            ✔ Recently merged/closed <span className="gh-pr-count">{buckets.closed.length}</span>
-          </div>
-          {showClosed && buckets.closed.map((p) => <PrRow key={p.url} pr={p} />)}
-        </div>
-        {total === 0 && buckets.closed.length === 0 && <div className="gh-placeholder">No pull requests. 🎉</div>}
+        <Section title="My PRs" count={myTotal} level={0}>
+          {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+          {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+          {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+          {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+          {myTotal === 0 && <div className="gh-placeholder">Nothing here. 🎉</div>}
+        </Section>
+        <Section title="Team PRs" count={groups.teamPrs.length} level={0}>
+          {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} />) : <div className="gh-placeholder">No review requests.</div>}
+        </Section>
       </div>
     </div>
-  );
-}
-
-function Bucket({ label, prs, tone }: { label: string; prs: PullRequest[]; tone?: "warn" }) {
-  if (prs.length === 0) return null;
-  return (
-    <div className="gh-pr-bucket">
-      <div className={`gh-pr-bucket-h${tone === "warn" ? " warn" : ""}`}>
-        {label} <span className="gh-pr-count">{prs.length}</span>
-      </div>
-      {prs.map((p) => <PrRow key={p.url} pr={p} />)}
-    </div>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-      <path d="M21 3v5h-5" />
-    </svg>
   );
 }
