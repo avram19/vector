@@ -178,6 +178,9 @@ export function Sidebar({
                   collapsed: state.github_collapsed_groups,
                 }}
                 onRepoUpdate={(patch) => update(patch)}
+                favoritedWorkflows={state.github_favorited_workflows}
+                onFavoritedWorkflows={(next) => update({ github_favorited_workflows: next })}
+                onOpenPreview={onOpenPreview ?? (() => {})}
               />
             )}
           </div>

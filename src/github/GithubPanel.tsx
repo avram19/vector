@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ReposView, RepoUpdate } from "./ReposView";
 import { PrInboxView } from "./PrInboxView";
+import { ActionsView } from "./ActionsView";
 
 export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
 
@@ -34,11 +35,17 @@ export function GithubPanel({
   onSubview,
   repoState,
   onRepoUpdate,
+  favoritedWorkflows,
+  onFavoritedWorkflows,
+  onOpenPreview,
 }: {
   subview: string;
   onSubview: (v: string) => void;
   repoState: GithubRepoState;
   onRepoUpdate: (patch: RepoUpdate) => void;
+  favoritedWorkflows: string[];
+  onFavoritedWorkflows: (next: string[]) => void;
+  onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +119,13 @@ export function GithubPanel({
           />
         )}
         {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} />}
-        {active === "actions" && <div className="gh-placeholder">Actions — coming in Plan 3</div>}
+        {active === "actions" && (
+          <ActionsView
+            favorites={favoritedWorkflows}
+            onFavorites={(next) => onFavoritedWorkflows(next)}
+            onOpenPreview={onOpenPreview}
+          />
+        )}
       </div>
     </div>
   );
