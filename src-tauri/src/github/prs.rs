@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use serde::{Deserialize, Serialize};
 
 use super::client;
@@ -24,15 +22,12 @@ pub struct PullRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct PrInbox {
+pub struct MyPrs {
     pub authored: Vec<PullRequest>,
-    pub review: Vec<PullRequest>,
     pub recently_closed: Vec<PullRequest>,
 }
 
-// One round-trip: three search aliases sharing a fragment. `author:@me` /
-// `review-requested:@me` span every repo the viewer can see.
-const QUERY: &str = r#"fragment prFields on PullRequest {
+const MY_QUERY: &str = r#"fragment prFields on PullRequest {
   number title url isDraft state headRefName reviewDecision mergeable updatedAt
   repository { nameWithOwner }
   author { login avatarUrl }
@@ -40,8 +35,17 @@ const QUERY: &str = r#"fragment prFields on PullRequest {
 }
 query {
   authored: search(query: "is:pr is:open author:@me sort:updated-desc", type: ISSUE, first: 50) { nodes { ...prFields } }
-  review: search(query: "is:pr is:open review-requested:@me sort:updated-desc", type: ISSUE, first: 50) { nodes { ...prFields } }
   closed: search(query: "is:pr author:@me is:closed sort:updated-desc", type: ISSUE, first: 30) { nodes { ...prFields } }
+}"#;
+
+const TEAM_QUERY: &str = r#"fragment prFields on PullRequest {
+  number title url isDraft state headRefName reviewDecision mergeable updatedAt
+  repository { nameWithOwner }
+  author { login avatarUrl }
+  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+}
+query {
+  review: search(query: "is:pr is:open review-requested:@me sort:updated-desc", type: ISSUE, first: 50) { nodes { ...prFields } }
 }"#;
 
 fn parse_pr(n: &serde_json::Value) -> PullRequest {
@@ -64,56 +68,67 @@ fn parse_pr(n: &serde_json::Value) -> PullRequest {
     }
 }
 
-/// Fetch the viewer's PR inbox (authored / review-requested / recently-closed)
-/// in one GraphQL round-trip. Blocking.
-pub fn list_prs() -> Result<PrInbox, String> {
-    let q = format!("query={QUERY}");
+fn run_search(query: &str) -> Result<serde_json::Value, String> {
+    let q = format!("query={query}");
     let raw = client::run_gh(&["api", "graphql", "-f", &q])?;
     let v: serde_json::Value =
         serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
-
-    // GraphQL reports errors (e.g. insufficient token scope, SSO) with HTTP 200
-    // and an `errors` array. Surface them instead of silently returning an empty
-    // inbox.
+    // GraphQL reports errors (token scope, SSO) with HTTP 200 + an `errors`
+    // array. Surface them instead of silently returning an empty result.
     if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
         let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
         return Err(msg.to_string());
     }
+    Ok(v)
+}
 
-    let collect = |alias: &str| -> Vec<PullRequest> {
-        v["data"][alias]["nodes"]
-            .as_array()
-            .map(|nodes| nodes.iter().map(parse_pr).collect())
-            .unwrap_or_default()
-    };
+fn collect(v: &serde_json::Value, alias: &str) -> Vec<PullRequest> {
+    v["data"][alias]["nodes"]
+        .as_array()
+        .map(|nodes| nodes.iter().map(parse_pr).collect())
+        .unwrap_or_default()
+}
 
-    Ok(PrInbox {
-        authored: collect("authored"),
-        review: collect("review"),
-        recently_closed: collect("closed"),
+/// My authored PRs (open) + my recently closed/merged PRs. One round-trip.
+pub fn list_my_prs() -> Result<MyPrs, String> {
+    let v = run_search(MY_QUERY)?;
+    Ok(MyPrs {
+        authored: collect(&v, "authored"),
+        recently_closed: collect(&v, "closed"),
     })
 }
 
-// ── disk cache (stale-while-revalidate), mirroring repos.rs ──
-fn cache_path() -> Option<PathBuf> {
-    dirs::cache_dir().map(|d| d.join("vector").join("prs.json"))
+/// Open PRs where I'm a requested reviewer. One round-trip.
+pub fn list_team_prs() -> Result<Vec<PullRequest>, String> {
+    let v = run_search(TEAM_QUERY)?;
+    Ok(collect(&v, "review"))
 }
 
-pub fn read_disk_cache() -> PrInbox {
-    let Some(p) = cache_path() else { return PrInbox::default() };
-    let Ok(text) = std::fs::read_to_string(&p) else { return PrInbox::default() };
+// ── disk caches (SWR), one file per kind ──
+fn cache_file(name: &str) -> Option<std::path::PathBuf> {
+    dirs::cache_dir().map(|d| d.join("vector").join(name))
+}
+
+fn read_json<T: serde::de::DeserializeOwned + Default>(name: &str) -> T {
+    let Some(p) = cache_file(name) else { return T::default() };
+    let Ok(text) = std::fs::read_to_string(&p) else { return T::default() };
     serde_json::from_str(&text).unwrap_or_default()
 }
 
-pub fn write_disk_cache(inbox: &PrInbox) {
-    let Some(p) = cache_path() else { return };
+fn write_json<T: Serialize>(name: &str, val: &T) {
+    let Some(p) = cache_file(name) else { return };
     if let Some(parent) = p.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Ok(text) = serde_json::to_string(inbox) {
+    if let Ok(text) = serde_json::to_string(val) {
         let tmp = p.with_extension("json.tmp");
         if std::fs::write(&tmp, text).is_ok() {
             let _ = std::fs::rename(&tmp, &p);
         }
     }
 }
+
+pub fn read_my_prs_cache() -> MyPrs { read_json("my-prs.json") }
+pub fn write_my_prs_cache(v: &MyPrs) { write_json("my-prs.json", v) }
+pub fn read_team_prs_cache() -> Vec<PullRequest> { read_json("team-prs.json") }
+pub fn write_team_prs_cache(v: &[PullRequest]) { write_json("team-prs.json", &v.to_vec()) }

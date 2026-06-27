@@ -807,10 +807,13 @@ fn main() {
             sidebar::open_in_editor,
             read_agent_cwd,
             github::gh_auth_status,
-            github::list_github_repos,
+            github::list_github_repos_page,
+            github::set_cached_github_repos,
             github::get_cached_github_repos,
-            github::list_github_prs,
-            github::get_cached_github_prs,
+            github::list_github_my_prs,
+            github::get_cached_github_my_prs,
+            github::list_github_team_prs,
+            github::get_cached_github_team_prs,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");
