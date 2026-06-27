@@ -42,6 +42,7 @@ export function GithubPanel({
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [repoFilter, setRepoFilter] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -107,9 +108,10 @@ export function GithubPanel({
             repoGroup={repoState.repoGroup}
             collapsed={repoState.collapsed}
             onUpdate={onRepoUpdate}
+            onOpenPrs={(repo) => { setRepoFilter(repo); onSubview("prs"); }}
           />
         )}
-        {active === "prs" && <PrInboxView pinned={repoState.pinned} />}
+        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} />}
         {active === "actions" && <div className="gh-placeholder">Actions — coming in Plan 3</div>}
       </div>
     </div>
