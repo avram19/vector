@@ -79,6 +79,7 @@ export function RepoFilterDropdown({ value, options, onChange }: {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
+            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
           />
           <div className="gh-combo-list">
             {items.map((o, i) => (

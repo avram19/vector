@@ -216,6 +216,7 @@ export function ReposView({
           placeholder="Search repos…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
         />
         {refreshing && (
           <span className="gh-dots" title="Updating…"><span /><span /><span /></span>

@@ -199,15 +199,22 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
 
   const myTotal = groups.action.length + groups.ready.length + groups.waiting.length + groups.done.length;
   const nothingLoaded = !mine && !team && !repoPrs;
-  const isLoading = repoFilter ? repoLoading : loading;
+  // Repo mode: loading whenever its on-demand fetch hasn't returned yet (even if
+  // the inbox was already loaded). Inbox mode: only before the first results.
+  const showLoading = repoFilter ? (repoLoading && !repoPrs) : (loading && !mine && !team);
 
   // A plain JSX element (NOT a nested component) so the search input keeps focus
   // across re-renders. Reused by both the error and normal returns.
   const chrome = (
     <>
       <div className="gh-search">
-        <input placeholder="Search Pull Requests…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        {refreshing && <span className="gh-dots" title="Updating…"><span /><span /><span /></span>}
+        <input
+          placeholder="Search Pull Requests…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+        />
+        {(refreshing || repoLoading) && <span className="gh-dots" title="Updating…"><span /><span /><span /></span>}
         <button className="gh-icobtn" title="Refresh" onClick={() => load(true)}><RefreshIcon /></button>
       </div>
       <div className="gh-pr-repofilter">
@@ -233,7 +240,7 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
     <div className="gh-prs">
       {chrome}
       <div className="gh-pr-list">
-        {isLoading && nothingLoaded ? (
+        {showLoading ? (
           <div className="gh-placeholder">Loading pull requests…</div>
         ) : (
           <>
