@@ -156,6 +156,7 @@
   --gh-accent-solid: #3a5f8a;
   --gh-star: #d9a23a;
   --gh-link: #58a6ff;
+  --gh-pop-bg: #1d1d27;
 }
 body.theme-light {
   --gh-fg: #33404a;
@@ -172,6 +173,7 @@ body.theme-light {
   --gh-accent-solid: #1f6feb;
   --gh-star: #b58900;
   --gh-link: #1f6feb;
+  --gh-pop-bg: #fbf4e3;
 }
 .gh-empty { padding: 16px; color: var(--gh-muted); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 13px; }
 .gh-empty a { color: var(--gh-link); }
@@ -258,7 +260,20 @@ body.theme-light {
 .gh-pill-btn { appearance: none; -webkit-appearance: none; border: 0; cursor: pointer; font: inherit; }
 .gh-pill-btn:hover { filter: brightness(1.15); }
 .gh-pr-repofilter { padding: 4px 10px 6px; display: flex; align-items: center; gap: 6px; }
-.gh-pr-repofilter select { flex: 1; min-width: 0; background: var(--gh-input-bg); color: var(--gh-fg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 4px 6px; font-size: 12px; outline: 0; }
+/* searchable repo combobox */
+.gh-combo { position: relative; flex: 1; min-width: 0; }
+.gh-combo-trigger { width: 100%; display: flex; align-items: center; gap: 6px; background: var(--gh-input-bg); color: var(--gh-fg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer; }
+.gh-combo-trigger:hover { border-color: var(--gh-faint); }
+.gh-combo-val { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.gh-combo-val.placeholder { color: var(--gh-muted); }
+.gh-combo-caret { color: var(--gh-faint); flex: 0 0 auto; font-size: 10px; }
+.gh-combo-pop { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; background: var(--gh-pop-bg); border: 1px solid var(--gh-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); overflow: hidden; }
+.gh-combo-search { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--gh-border); background: transparent; color: var(--gh-fg); padding: 8px 10px; font-size: 12px; outline: 0; }
+.gh-combo-list { max-height: 260px; overflow: auto; padding: 4px; }
+.gh-combo-opt { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--gh-fg); padding: 6px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-combo-opt:hover { background: var(--gh-row-hover); }
+.gh-combo-opt.sel { background: var(--gh-hover); font-weight: 600; }
+.gh-combo-empty { padding: 8px; color: var(--gh-faint); font-size: 12px; }
 .gh-pr-section.level-0 { margin-top: 6px; }
 .gh-pr-section.level-1 { margin-top: 2px; }
 .gh-pr-section-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: pointer; user-select: none; }

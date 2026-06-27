@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { RepoFilterDropdown } from "./RepoFilterDropdown";
 
 export type PullRequest = {
   repo: string; number: number; title: string; url: string;
@@ -210,10 +211,7 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
         <button className="gh-icobtn" title="Refresh" onClick={() => load(true)}><RefreshIcon /></button>
       </div>
       <div className="gh-pr-repofilter">
-        <select value={repoFilter ?? ""} onChange={(e) => onRepoFilter(e.target.value || null)}>
-          <option value="">All repos</option>
-          {repoOptions.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
+        <RepoFilterDropdown value={repoFilter} options={repoOptions} onChange={onRepoFilter} />
         {repoFilter && (
           <button className="gh-icobtn" title="Clear repo filter" onClick={() => onRepoFilter(null)}>✕</button>
         )}
