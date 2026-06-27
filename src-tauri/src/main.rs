@@ -655,6 +655,7 @@ struct SidebarConfigPatch {
     github_repo_group: Option<std::collections::BTreeMap<String, String>>,
     github_pinned_repos: Option<Vec<String>>,
     github_collapsed_groups: Option<Vec<String>>,
+    github_favorited_workflows: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -670,6 +671,7 @@ async fn update_sidebar_config(state: State<'_, AppState>, patch: SidebarConfigP
     if let Some(v) = patch.github_repo_group { cfg.github_repo_group = v; }
     if let Some(v) = patch.github_pinned_repos { cfg.github_pinned_repos = v; }
     if let Some(v) = patch.github_collapsed_groups { cfg.github_collapsed_groups = v; }
+    if let Some(v) = patch.github_favorited_workflows { cfg.github_favorited_workflows = v; }
     config::save_ui_config(&cfg).map_err(|e| e.to_string())
 }
 
@@ -815,6 +817,11 @@ fn main() {
             github::list_github_team_prs,
             github::get_cached_github_team_prs,
             github::list_github_repo_prs,
+            github::list_github_workflows,
+            github::list_github_runs,
+            github::list_github_jobs,
+            github::list_github_favorite_runs,
+            github::get_github_job_log,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");

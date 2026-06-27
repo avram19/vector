@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod client;
 pub mod prs;
 pub mod repos;
@@ -123,4 +124,29 @@ pub async fn list_github_repo_prs(
     tauri::async_runtime::spawn_blocking(move || prs::list_repo_prs(&repo, after.as_deref()))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn list_github_workflows(_state: State<'_, AppState>, repo: String) -> Result<Vec<actions::Workflow>, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::list_workflows(&repo)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn list_github_runs(_state: State<'_, AppState>, repo: String, workflow: Option<String>, per_page: u32) -> Result<Vec<actions::Run>, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::list_runs(&repo, workflow.as_deref(), per_page)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn list_github_jobs(_state: State<'_, AppState>, repo: String, run_id: u64) -> Result<Vec<actions::Job>, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::list_jobs(&repo, run_id)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn list_github_favorite_runs(_state: State<'_, AppState>, favorites: Vec<String>) -> Result<Vec<actions::Run>, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::favorite_runs(&favorites)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn get_github_job_log(_state: State<'_, AppState>, repo: String, job_id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::job_log(&repo, job_id)).await.map_err(|e| e.to_string())?
 }
