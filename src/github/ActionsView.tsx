@@ -33,12 +33,13 @@ function StatusGlyph({ status, conclusion }: { status: string; conclusion: strin
 
 function favKey(repo: string, path: string) { return `${repo}:${path.split("/").pop()}`; }
 
-export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRepo }: {
+export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRepo, onTrigger }: {
   favorites: string[];
   onFavorites: (next: string[]) => void;
   onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
   repo: string | null;
   onRepo: (r: string | null) => void;
+  onTrigger: (target: { repo: string; presetWorkflowId?: number }) => void;
 }) {
   const [favRuns, setFavRuns] = useState<Run[] | null>(null);
   const [allRepos, setAllRepos] = useState<string[]>([]);
@@ -118,6 +119,20 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
     );
   };
 
+  const refreshRuns = (wfId: number) => {
+    if (!repo) return;
+    invoke<Run[]>("list_github_runs", { repo, workflow: String(wfId), perPage: 15 })
+      .then((rs) => setRunsByWf((m) => ({ ...m, [wfId]: rs }))).catch((e) => setError(String(e)));
+  };
+  const rerun = (run: Run, failedOnly: boolean) => {
+    invoke("github_rerun", { repo: run.repo, runId: run.id, failedOnly })
+      .then(() => refreshRuns(run.workflowId)).catch((e) => setError(String(e)));
+  };
+  const cancel = (run: Run) => {
+    invoke("github_cancel", { repo: run.repo, runId: run.id })
+      .then(() => refreshRuns(run.workflowId)).catch((e) => setError(String(e)));
+  };
+
   const isFav = (repo: string, path: string) => favorites.includes(favKey(repo, path));
   const toggleFav = (repo: string, path: string) => {
     const k = favKey(repo, path);
@@ -168,6 +183,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                 title={isFav(repo!, wf.path) ? "Unfavorite" : "Favorite"}
                 onClick={(e) => { e.stopPropagation(); toggleFav(repo!, wf.path); }}
               >{isFav(repo!, wf.path) ? "★" : "☆"}</span>
+              <button className="gh-job-log" onClick={(e) => { e.stopPropagation(); onTrigger({ repo: repo!, presetWorkflowId: wf.id }); }}>Run ▸</button>
             </div>
             {openWf === wf.id && (runsByWf[wf.id] ?? []).map((run) => (
               <div className="gh-run-wrap" key={run.id}>
@@ -178,6 +194,14 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                     <div className="gh-run-l1"><span className="gh-run-n">#{run.runNumber}</span> <span className="gh-run-title">{run.displayTitle || run.branch}</span></div>
                     <div className="gh-run-l2"><span className="gh-run-branch">{run.branch}</span> · {run.event} · {run.actor} · {relTime(run.createdAt)}</div>
                   </div>
+                  <span className="gh-run-actions" onClick={(e) => e.stopPropagation()}>
+                    {run.status !== "completed"
+                      ? <button className="gh-job-log" onClick={() => cancel(run)}>Cancel</button>
+                      : <>
+                          <button className="gh-job-log" onClick={() => rerun(run, false)}>Re-run</button>
+                          {run.conclusion === "failure" && <button className="gh-job-log" onClick={() => rerun(run, true)}>Re-run failed</button>}
+                        </>}
+                  </span>
                 </div>
                 {openRun === run.id && (jobsByRun[run.id] ?? []).map((job) => (
                   <div className="gh-job" key={job.id}>

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ReposView, RepoUpdate } from "./ReposView";
 import { PrInboxView } from "./PrInboxView";
 import { ActionsView } from "./ActionsView";
+import { TriggerModal } from "./TriggerModal";
 
 export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
 
@@ -51,6 +52,7 @@ export function GithubPanel({
   const [loading, setLoading] = useState(true);
   const [repoFilter, setRepoFilter] = useState<string | null>(null);
   const [actionsRepo, setActionsRepo] = useState<string | null>(null);
+  const [triggerTarget, setTriggerTarget] = useState<{ repo: string; presetRef?: string; presetWorkflowId?: number } | null>(null);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -120,7 +122,7 @@ export function GithubPanel({
             onOpenActions={(repo) => { setActionsRepo(repo); onSubview("actions"); }}
           />
         )}
-        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} />}
+        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} />}
         {active === "actions" && (
           <ActionsView
             favorites={favoritedWorkflows}
@@ -128,9 +130,18 @@ export function GithubPanel({
             onOpenPreview={onOpenPreview}
             repo={actionsRepo}
             onRepo={setActionsRepo}
+            onTrigger={(t) => setTriggerTarget(t)}
           />
         )}
       </div>
+      {triggerTarget && (
+        <TriggerModal
+          repo={triggerTarget.repo}
+          presetRef={triggerTarget.presetRef}
+          presetWorkflowId={triggerTarget.presetWorkflowId}
+          onClose={() => setTriggerTarget(null)}
+        />
+      )}
     </div>
   );
 }
