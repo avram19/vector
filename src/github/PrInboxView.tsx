@@ -45,7 +45,7 @@ function Avatar({ pr }: { pr: PullRequest }) {
   return <span className="gh-pr-avatar gh-pr-avatar--fallback">{initials(pr.author)}</span>;
 }
 
-function PrRow({ pr }: { pr: PullRequest }) {
+function PrRow({ pr, onTrigger }: { pr: PullRequest; onTrigger: (t: { repo: string; presetRef?: string }) => void }) {
   const chips: { label: string; cls: string }[] = [];
   if (pr.state === "MERGED") chips.push({ label: "Merged", cls: "merged" });
   else if (pr.state === "CLOSED") chips.push({ label: "Closed", cls: "closed" });
@@ -67,6 +67,10 @@ function PrRow({ pr }: { pr: PullRequest }) {
         <span className="gh-pr-repo">{pr.repo}</span>
         {chips.map((c) => <span key={c.label} className={`gh-pr-chip ${c.cls}`}>{c.label}</span>)}
         <span className="gh-pr-spacer" />
+        {pr.state === "OPEN" && (
+          <button className="gh-pr-deploy" title={`Run a workflow on ${pr.headRef}`}
+            onClick={(e) => { e.stopPropagation(); onTrigger({ repo: pr.repo, presetRef: pr.headRef }); }}>Deploy</button>
+        )}
         <Avatar pr={pr} />
         <span className="gh-pr-time">{relTime(pr.updatedAt)}</span>
       </div>
@@ -98,10 +102,11 @@ function RefreshIcon() {
   );
 }
 
-export function PrInboxView({ repoFilter, onRepoFilter, login }: {
+export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger }: {
   repoFilter: string | null;
   onRepoFilter: (r: string | null) => void;
   login: string;
+  onTrigger: (target: { repo: string; presetRef?: string }) => void;
 }) {
   const [mine, setMine] = useState<MyPrs | null>(null);
   const [team, setTeam] = useState<PullRequest[] | null>(null);
@@ -269,14 +274,14 @@ export function PrInboxView({ repoFilter, onRepoFilter, login }: {
         ) : (
           <>
             <Section title="My Pull Requests" count={myTotal} level={0}>
-              {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-              {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-              {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
-              {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} />)}</Section>}
+              {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} />)}</Section>}
+              {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} />)}</Section>}
+              {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} />)}</Section>}
+              {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} />)}</Section>}
               {myTotal === 0 && <div className="gh-placeholder">Nothing here. 🎉</div>}
             </Section>
             <Section title="Team Pull Requests" count={groups.teamPrs.length} level={0}>
-              {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} />) : <div className="gh-placeholder">No pull requests.</div>}
+              {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} />) : <div className="gh-placeholder">No pull requests.</div>}
               {!repoFilter && teamCursor && <ViewMore loading={teamMore} onClick={loadMoreTeam} />}
             </Section>
             {repoFilter && repoCursor && <ViewMore loading={repoMore} onClick={loadMoreRepo} />}
