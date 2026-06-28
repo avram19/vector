@@ -155,3 +155,23 @@ pub async fn get_github_job_log(_state: State<'_, AppState>, repo: String, job_i
 pub async fn prepare_github_job_log(_state: State<'_, AppState>, job_id: u64) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || actions::job_log_loading(job_id)).await.map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn github_workflow_inputs(_state: State<'_, AppState>, repo: String, path: String) -> Result<Vec<actions::DispatchInput>, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::workflow_inputs(&repo, &path)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn github_dispatch(_state: State<'_, AppState>, repo: String, workflow: String, git_ref: String, inputs: Vec<(String, String)>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || actions::dispatch(&repo, &workflow, &git_ref, inputs)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn github_rerun(_state: State<'_, AppState>, repo: String, run_id: u64, failed_only: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || actions::rerun(&repo, run_id, failed_only)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn github_cancel(_state: State<'_, AppState>, repo: String, run_id: u64) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || actions::cancel(&repo, run_id)).await.map_err(|e| e.to_string())?
+}

@@ -176,3 +176,81 @@ pub fn job_log_loading(job_id: u64) -> Result<String, String> {
     std::fs::write(&path, "Fetching logs from GitHub…\n").map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchInput {
+    pub name: String,
+    pub description: Option<String>,
+    pub required: bool,
+    #[serde(rename = "type")]
+    pub input_type: String,
+    pub default: Option<String>,
+    pub options: Vec<String>,
+}
+
+/// Fetch a workflow file (raw) and parse its `on.workflow_dispatch.inputs` schema.
+pub fn workflow_inputs(repo: &str, path: &str) -> Result<Vec<DispatchInput>, String> {
+    // Fetch the raw file (Accept: raw) so we skip base64 decoding.
+    let text = client::run_gh(&["api", &format!("repos/{repo}/contents/{path}"), "-H", "Accept: application/vnd.github.raw"])?;
+    let doc: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| format!("yaml: {e}"))?;
+
+    // `on:` may parse as the string "on" or the bool true — try both.
+    let on = doc.get("on").or_else(|| doc.get(serde_yaml::Value::Bool(true)));
+    let inputs = on
+        .and_then(|o| o.get("workflow_dispatch"))
+        .and_then(|wd| wd.get("inputs"));
+    let mut out = Vec::new();
+    if let Some(serde_yaml::Value::Mapping(map)) = inputs {
+        for (k, spec) in map {
+            let name = k.as_str().unwrap_or_default().to_string();
+            if name.is_empty() { continue; }
+            let opts = spec.get("options").and_then(|o| o.as_sequence()).map(|seq| {
+                seq.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect()
+            }).unwrap_or_default();
+            let default = spec.get("default").map(|d| match d {
+                serde_yaml::Value::Bool(b) => b.to_string(),
+                serde_yaml::Value::Number(n) => n.to_string(),
+                serde_yaml::Value::String(s) => s.clone(),
+                _ => String::new(),
+            });
+            out.push(DispatchInput {
+                name,
+                description: spec.get("description").and_then(|d| d.as_str()).map(|s| s.to_string()),
+                required: spec.get("required").and_then(|r| r.as_bool()).unwrap_or(false),
+                input_type: spec.get("type").and_then(|t| t.as_str()).unwrap_or("string").to_string(),
+                default,
+                options: opts,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn post_ok(args: &[&str]) -> Result<(), String> {
+    client::run_gh(args).map(|_| ())
+}
+
+/// Trigger a workflow_dispatch on `git_ref` with string inputs.
+pub fn dispatch(repo: &str, workflow: &str, git_ref: &str, inputs: Vec<(String, String)>) -> Result<(), String> {
+    let path = format!("repos/{repo}/actions/workflows/{workflow}/dispatches");
+    let mut owned: Vec<String> = vec![
+        "api".into(), "-X".into(), "POST".into(), path,
+        "-f".into(), format!("ref={git_ref}"),
+    ];
+    for (k, val) in &inputs {
+        owned.push("-f".into());
+        owned.push(format!("inputs[{k}]={val}"));
+    }
+    let refs: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
+    post_ok(&refs)
+}
+
+pub fn rerun(repo: &str, run_id: u64, failed_only: bool) -> Result<(), String> {
+    let ep = if failed_only { "rerun-failed-jobs" } else { "rerun" };
+    post_ok(&["api", "-X", "POST", &format!("repos/{repo}/actions/runs/{run_id}/{ep}")])
+}
+
+pub fn cancel(repo: &str, run_id: u64) -> Result<(), String> {
+    post_ok(&["api", "-X", "POST", &format!("repos/{repo}/actions/runs/{run_id}/cancel")])
+}
