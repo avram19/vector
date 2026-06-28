@@ -7,6 +7,7 @@ export type Step = { name: string; status: string; conclusion: string | null; nu
 export type Job = { id: number; name: string; status: string; conclusion: string | null; startedAt: string | null; completedAt: string | null; steps: Step[] };
 export type Run = {
   id: number; runNumber: number; workflowId: number; workflowName: string;
+  displayTitle: string;
   status: string; conclusion: string | null; branch: string; event: string;
   actor: string; headSha: string; createdAt: string; repo: string;
 };
@@ -174,8 +175,8 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                   <span className="gh-caret">{openRun === run.id ? "▾" : "▸"}</span>
                   <StatusGlyph status={run.status} conclusion={run.conclusion} />
                   <div className="gh-run-main">
-                    <div className="gh-run-l1"><span className="gh-run-n">#{run.runNumber}</span> <span className="gh-run-branch">{run.branch}</span></div>
-                    <div className="gh-run-l2">{run.event} · {run.actor} · {relTime(run.createdAt)}</div>
+                    <div className="gh-run-l1"><span className="gh-run-n">#{run.runNumber}</span> <span className="gh-run-title">{run.displayTitle || run.branch}</span></div>
+                    <div className="gh-run-l2"><span className="gh-run-branch">{run.branch}</span> · {run.event} · {run.actor} · {relTime(run.createdAt)}</div>
                   </div>
                 </div>
                 {openRun === run.id && (jobsByRun[run.id] ?? []).map((job) => (

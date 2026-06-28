@@ -306,6 +306,7 @@ body.theme-light {
 .gh-run-l1 { display: flex; gap: 6px; align-items: baseline; color: var(--gh-fg); font-size: 12.5px; }
 .gh-run-wf { font-weight: 600; }
 .gh-run-n { color: var(--gh-faint); font-size: 11px; }
+.gh-run-title { color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gh-run-l2 { color: var(--gh-faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gh-run-repo { color: var(--gh-muted); }
 .gh-run-branch { color: var(--gh-accent); }

@@ -18,6 +18,9 @@ pub struct Run {
     pub run_number: u64,
     pub workflow_id: u64,
     pub workflow_name: String,
+    /// The run's display title — honors the workflow's `run-name:` (which is the
+    /// only place dispatch inputs surface, e.g. `run-name: Deploy ${{inputs.v}}`).
+    pub display_title: String,
     pub status: String,
     pub conclusion: Option<String>,
     pub branch: String,
@@ -76,6 +79,7 @@ fn parse_run(r: &serde_json::Value, repo: &str) -> Run {
         run_number: r["run_number"].as_u64().unwrap_or(0),
         workflow_id: r["workflow_id"].as_u64().unwrap_or(0),
         workflow_name: r["name"].as_str().unwrap_or_default().to_string(),
+        display_title: r["display_title"].as_str().unwrap_or_default().to_string(),
         status: r["status"].as_str().unwrap_or_default().to_string(),
         conclusion: r["conclusion"].as_str().map(|s| s.to_string()),
         branch: r["head_branch"].as_str().unwrap_or_default().to_string(),
