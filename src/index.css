@@ -325,3 +325,18 @@ body.theme-light {
 .gh-job-log { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-accent); border-radius: 6px; padding: 1px 8px; font-size: 11px; cursor: pointer; flex: 0 0 auto; }
 .gh-job-log:hover { background: var(--gh-row-hover); }
 .gh-job-running { color: var(--gh-faint); font-size: 11px; flex: 0 0 auto; }
+
+/* ── GitHub trigger modal ─────────────────────────────────── */
+.gh-modal-backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; }
+.gh-modal { width: 380px; max-width: 90vw; max-height: 85vh; overflow: auto; background: var(--gh-pop-bg); border: 1px solid var(--gh-border); border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.gh-modal-h { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--gh-border); font-size: 13px; font-weight: 600; color: var(--gh-fg); }
+.gh-modal-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.gh-field { display: flex; flex-direction: column; gap: 4px; }
+.gh-field > span { font-size: 11px; color: var(--gh-muted); }
+.gh-field input, .gh-field select { background: var(--gh-input-bg); color: var(--gh-fg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 5px 8px; font-size: 12px; outline: 0; }
+.gh-modal-run { background: var(--gh-accent-solid); color: #fff; border: 0; border-radius: 7px; padding: 7px 12px; font-size: 12px; cursor: pointer; }
+.gh-modal-run:disabled { opacity: 0.5; cursor: default; }
+.gh-modal-ok { color: #2ea043; font-size: 12px; }
+.gh-run-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.gh-pr-deploy { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-accent); border-radius: 6px; padding: 0 7px; font-size: 10px; cursor: pointer; flex: 0 0 auto; }
+.gh-pr-deploy:hover { background: var(--gh-row-hover); }
