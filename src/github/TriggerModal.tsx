@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Workflow } from "./ActionsView";
 
@@ -85,15 +85,10 @@ export function TriggerModal({ repo, presetRef, presetWorkflowId, onClose }: {
               <input value={gitRef} onChange={(e) => setGitRef(e.target.value)} placeholder="main" autoComplete="off" spellCheck={false} />
             </label>
             {wf && inputs === null && <div className="gh-placeholder">Loading inputs…</div>}
-            {inputs?.map((i) => (
+            {inputs?.filter((i) => i.type !== "boolean").map((i) => (
               <label className="gh-field" key={i.name}>
                 <span>{i.name}{i.required ? " *" : ""}{i.description ? ` — ${i.description}` : ""}</span>
-                {i.type === "boolean" ? (
-                  <select value={values[i.name] ?? "false"} onChange={(e) => setValues((v) => ({ ...v, [i.name]: e.target.value }))}>
-                    <option value="false">false</option>
-                    <option value="true">true</option>
-                  </select>
-                ) : i.type === "choice" && i.options.length ? (
+                {i.type === "choice" && i.options.length ? (
                   <select value={values[i.name] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [i.name]: e.target.value }))}>
                     {i.options.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
@@ -102,10 +97,79 @@ export function TriggerModal({ repo, presetRef, presetWorkflowId, onClose }: {
                 )}
               </label>
             ))}
+            {(() => {
+              const booleans = (inputs ?? []).filter((i) => i.type === "boolean");
+              if (!booleans.length) return null;
+              const on = booleans.filter((b) => values[b.name] === "true").length;
+              return (
+                <div className="gh-field">
+                  <span>Toggles ({on}/{booleans.length} on)</span>
+                  <BooleanMultiSelect
+                    items={booleans}
+                    values={values}
+                    onToggle={(name, isOn) => setValues((v) => ({ ...v, [name]: isOn ? "true" : "false" }))}
+                  />
+                </div>
+              );
+            })()}
             <button className="gh-modal-run" disabled={!wf || busy} onClick={run}>{busy ? "Running…" : "Run workflow"}</button>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function Chevron() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+/// Groups many boolean workflow inputs into one searchable multi-select
+/// (checked = "true"), instead of a column of true/false dropdowns.
+function BooleanMultiSelect({ items, values, onToggle }: {
+  items: DispatchInput[];
+  values: Record<string, string>;
+  onToggle: (name: string, on: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc, true);
+    return () => document.removeEventListener("mousedown", onDoc, true);
+  }, [open]);
+
+  const selected = items.filter((i) => values[i.name] === "true").length;
+  const ql = q.trim().toLowerCase();
+  const filtered = ql ? items.filter((i) => i.name.toLowerCase().includes(ql) || (i.description ?? "").toLowerCase().includes(ql)) : items;
+
+  return (
+    <div className="gh-combo" ref={ref}>
+      <button type="button" className="gh-combo-trigger" onClick={() => setOpen((v) => !v)}>
+        <span className={`gh-combo-val${selected ? "" : " placeholder"}`}>{selected ? `${selected} selected` : "None selected"}</span>
+        <span className="gh-combo-caret"><Chevron /></span>
+      </button>
+      {open && (
+        <div className="gh-combo-pop">
+          <input className="gh-combo-search" placeholder="Search options…" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} />
+          <div className="gh-combo-list">
+            {filtered.map((i) => (
+              <label key={i.name} className="gh-ms-opt" title={i.description ?? i.name}>
+                <input type="checkbox" checked={values[i.name] === "true"} onChange={(e) => onToggle(i.name, e.target.checked)} />
+                <span>{i.name}{i.description ? ` — ${i.description}` : ""}</span>
+              </label>
+            ))}
+            {filtered.length === 0 && <div className="gh-combo-empty">No matches</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

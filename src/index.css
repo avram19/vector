@@ -279,6 +279,9 @@ body.theme-light {
 .gh-combo-opt:hover, .gh-combo-opt.active { background: var(--gh-row-hover); }
 .gh-combo-opt.sel { background: var(--gh-hover); font-weight: 600; }
 .gh-combo-empty { padding: 8px; color: var(--gh-faint); font-size: 12px; }
+.gh-ms-opt { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; color: var(--gh-fg); cursor: pointer; border-radius: 6px; }
+.gh-ms-opt:hover { background: var(--gh-row-hover); }
+.gh-ms-opt input { flex: 0 0 auto; margin: 0; }
 .gh-pr-section.level-0 { margin-top: 6px; }
 .gh-pr-section.level-1 { margin-top: 2px; }
 .gh-pr-section-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: pointer; user-select: none; }
