@@ -32,14 +32,15 @@ function StatusGlyph({ status, conclusion }: { status: string; conclusion: strin
 
 function favKey(repo: string, path: string) { return `${repo}:${path.split("/").pop()}`; }
 
-export function ActionsView({ favorites, onFavorites, onOpenPreview }: {
+export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRepo }: {
   favorites: string[];
   onFavorites: (next: string[]) => void;
   onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
+  repo: string | null;
+  onRepo: (r: string | null) => void;
 }) {
   const [favRuns, setFavRuns] = useState<Run[] | null>(null);
   const [allRepos, setAllRepos] = useState<string[]>([]);
-  const [repo, setRepo] = useState<string | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[] | null>(null);
   const [runsByWf, setRunsByWf] = useState<Record<number, Run[]>>({});
   const [jobsByRun, setJobsByRun] = useState<Record<number, Job[]>>({});
@@ -86,10 +87,34 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview }: {
     }
   };
 
+  // Open the preview pane instantly on a placeholder, then swap in the real log
+  // (distinct path → the pane re-reads) once the download finishes.
+  const showLog = (repo: string, jobId: number, placeholderKey: number, fetchReal: () => Promise<string>) => {
+    invoke<string>("prepare_github_job_log", { jobId: placeholderKey })
+      .then((p) => onOpenPreview(p, undefined, undefined, { pin: false }))
+      .catch(() => {})
+      .finally(() => {
+        fetchReal()
+          .then((p) => onOpenPreview(p, undefined, undefined, { pin: false }))
+          .catch((e) => setError(`Failed to load log: ${e}`));
+      });
+  };
+
   const openLog = (run: Run, job: Job) => {
-    invoke<string>("get_github_job_log", { repo: run.repo, jobId: job.id })
-      .then((path) => onOpenPreview(path, undefined, undefined, { pin: false }))
-      .catch((e) => setError(`Failed to load log: ${e}`));
+    showLog(run.repo, job.id, job.id, () => invoke<string>("get_github_job_log", { repo: run.repo, jobId: job.id }));
+  };
+
+  // From a favorited run: open the most relevant job's log (a failed job if any,
+  // else the first completed job).
+  const openRunLog = (run: Run) => {
+    showLog(run.repo, run.id, run.id, () =>
+      invoke<Job[]>("list_github_jobs", { repo: run.repo, runId: run.id }).then((jobs) => {
+        const done = jobs.filter((j) => j.status === "completed");
+        const target = done.find((j) => j.conclusion === "failure" || j.conclusion === "timed_out") ?? done[0];
+        if (!target) return Promise.reject("no completed job yet");
+        return invoke<string>("get_github_job_log", { repo: run.repo, jobId: target.id });
+      })
+    );
   };
 
   const isFav = (repo: string, path: string) => favorites.includes(favKey(repo, path));
@@ -109,11 +134,17 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview }: {
         {favRuns === null && <div className="gh-placeholder">Loading…</div>}
         {favRuns !== null && favRuns.length === 0 && <div className="gh-placeholder">Star a workflow below to track it here.</div>}
         {favRuns?.map((r) => (
-          <div className="gh-run" key={`${r.repo}-${r.id}`} onClick={() => { setRepo(r.repo); }}>
-            <StatusGlyph status={r.status} conclusion={r.conclusion} />
-            <div className="gh-run-main">
-              <div className="gh-run-l1"><span className="gh-run-wf">{r.workflowName}</span> <span className="gh-run-n">#{r.runNumber}</span></div>
-              <div className="gh-run-l2"><span className="gh-run-repo">{r.repo}</span> · <span className="gh-run-branch">{r.branch}</span> · {r.event} · {relTime(r.createdAt)}</div>
+          <div className="gh-fav" key={`${r.repo}-${r.id}`}>
+            <div className="gh-fav-top">
+              <div className="gh-fav-title" onClick={() => onRepo(r.repo)} title={`${r.repo} · ${r.workflowName}`}>
+                <span className="gh-fav-repo">{r.repo}</span>
+                <span className="gh-fav-wf">{r.workflowName}</span>
+              </div>
+              <button className="gh-job-log" onClick={() => openRunLog(r)}>Logs</button>
+            </div>
+            <div className="gh-fav-run" onClick={() => onRepo(r.repo)}>
+              <StatusGlyph status={r.status} conclusion={r.conclusion} />
+              <span className="gh-run-n">#{r.runNumber}</span> · <span className="gh-run-branch">{r.branch}</span> · {r.event} · {relTime(r.createdAt)}
             </div>
           </div>
         ))}
@@ -122,7 +153,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview }: {
       <div className="gh-act-section">
         <div className="gh-act-h">Repository</div>
         <div className="gh-pr-repofilter">
-          <RepoFilterDropdown value={repo} options={repoOptions} onChange={setRepo} />
+          <RepoFilterDropdown value={repo} options={repoOptions} onChange={onRepo} />
         </div>
         {repo && workflows === null && <div className="gh-placeholder">Loading workflows…</div>}
         {workflows?.length === 0 && <div className="gh-placeholder">No workflows.</div>}

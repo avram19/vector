@@ -159,3 +159,16 @@ pub fn job_log(repo: &str, job_id: u64) -> Result<String, String> {
     std::fs::write(&path, text).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
+
+/// Write a tiny placeholder log file (no network) so the preview pane can open
+/// instantly with a "fetching" message while `job_log` downloads the real log.
+/// Uses a distinct path so re-opening the real log re-reads the preview.
+pub fn job_log_loading(job_id: u64) -> Result<String, String> {
+    let dir = dirs::cache_dir()
+        .map(|d| d.join("vector").join("logs"))
+        .ok_or("no cache dir")?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("job-{job_id}-loading.log"));
+    std::fs::write(&path, "Fetching logs from GitHub…\n").map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}

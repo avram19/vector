@@ -822,6 +822,7 @@ fn main() {
             github::list_github_jobs,
             github::list_github_favorite_runs,
             github::get_github_job_log,
+            github::prepare_github_job_log,
         ])
         .setup(|app| {
             let _ = app.get_webview_window("main");

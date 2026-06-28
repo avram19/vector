@@ -60,6 +60,7 @@ export function ReposView({
   collapsed,
   onUpdate,
   onOpenPrs,
+  onOpenActions,
 }: {
   pinned: string[];
   customGroups: string[];
@@ -67,6 +68,7 @@ export function ReposView({
   collapsed: string[];
   onUpdate: (patch: RepoUpdate) => void;
   onOpenPrs: (repo: string) => void;
+  onOpenActions: (repo: string) => void;
 }) {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -334,6 +336,7 @@ export function ReposView({
             { label: pinned.includes(menu.repo.nameWithOwner) ? "Unpin" : "Pin to Favorites", onClick: () => togglePin(menu.repo.nameWithOwner) },
             ...customGroups.map((g) => ({ label: `Move to: ${g}`, onClick: () => moveToGroup(menu.repo.nameWithOwner, g) })),
             ...(repoGroup[menu.repo.nameWithOwner] ? [{ label: "Remove from group", onClick: () => moveToGroup(menu.repo.nameWithOwner, null) }] : []),
+            { label: "Open Actions", onClick: () => onOpenActions(menu.repo.nameWithOwner) },
             { label: "Open on GitHub", onClick: () => invoke("open_path", { path: `https://github.com/${menu.repo.nameWithOwner}` }) },
           ]}
         />

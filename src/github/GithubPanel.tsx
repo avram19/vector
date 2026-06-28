@@ -50,6 +50,7 @@ export function GithubPanel({
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [repoFilter, setRepoFilter] = useState<string | null>(null);
+  const [actionsRepo, setActionsRepo] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -116,6 +117,7 @@ export function GithubPanel({
             collapsed={repoState.collapsed}
             onUpdate={onRepoUpdate}
             onOpenPrs={(repo) => { setRepoFilter(repo); onSubview("prs"); }}
+            onOpenActions={(repo) => { setActionsRepo(repo); onSubview("actions"); }}
           />
         )}
         {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} />}
@@ -124,6 +126,8 @@ export function GithubPanel({
             favorites={favoritedWorkflows}
             onFavorites={(next) => onFavoritedWorkflows(next)}
             onOpenPreview={onOpenPreview}
+            repo={actionsRepo}
+            onRepo={setActionsRepo}
           />
         )}
       </div>

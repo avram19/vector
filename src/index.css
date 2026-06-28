@@ -293,6 +293,12 @@ body.theme-light {
 .gh-actions-err { margin: 6px 10px; padding: 6px 8px; font-size: 11px; color: #f85149; border: 1px solid rgba(248,81,73,0.4); border-radius: 6px; cursor: pointer; }
 .gh-act-section { margin-top: 8px; }
 .gh-act-h { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--gh-muted); }
+.gh-fav { margin: 4px 8px; padding: 7px 9px; border: 1px solid var(--gh-border); border-radius: 8px; }
+.gh-fav-top { display: flex; align-items: flex-start; gap: 8px; }
+.gh-fav-title { flex: 1; min-width: 0; cursor: pointer; }
+.gh-fav-repo { display: block; font-size: 11px; color: var(--gh-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-fav-wf { display: block; font-size: 13px; font-weight: 600; color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-fav-run { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--gh-faint); cursor: pointer; }
 .gh-run { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; cursor: pointer; }
 .gh-run:hover { background: var(--gh-row-hover); }
 .gh-run-wrap { padding-left: 14px; }

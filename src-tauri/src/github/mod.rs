@@ -150,3 +150,8 @@ pub async fn list_github_favorite_runs(_state: State<'_, AppState>, favorites: V
 pub async fn get_github_job_log(_state: State<'_, AppState>, repo: String, job_id: u64) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || actions::job_log(&repo, job_id)).await.map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn prepare_github_job_log(_state: State<'_, AppState>, job_id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || actions::job_log_loading(job_id)).await.map_err(|e| e.to_string())?
+}
