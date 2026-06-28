@@ -199,7 +199,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                       ? <button className="gh-job-log" onClick={() => cancel(run)}>Cancel</button>
                       : <>
                           <button className="gh-job-log" onClick={() => rerun(run, false)}>Re-run</button>
-                          {run.conclusion === "failure" && <button className="gh-job-log" onClick={() => rerun(run, true)}>Re-run failed</button>}
+                          {(run.conclusion === "failure" || run.conclusion === "timed_out") && <button className="gh-job-log" onClick={() => rerun(run, true)}>Re-run failed</button>}
                         </>}
                   </span>
                 </div>

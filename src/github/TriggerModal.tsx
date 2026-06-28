@@ -24,7 +24,7 @@ export function TriggerModal({ repo, presetRef, presetWorkflowId, onClose }: {
 
   useEffect(() => {
     invoke<Workflow[]>("list_github_workflows", { repo })
-      .then((ws) => { setWorkflows(ws); if (!gitRef && ws.length) setGitRef(""); })
+      .then(setWorkflows)
       .catch((e) => setError(String(e)));
   }, [repo]);
 
@@ -41,7 +41,7 @@ export function TriggerModal({ repo, presetRef, presetWorkflowId, onClose }: {
         setValues(init);
       })
       .catch((e) => setError(String(e)));
-  }, [wf, repo]);
+  }, [wf?.id, repo]);
 
   const run = () => {
     if (!wf) return;
@@ -51,8 +51,8 @@ export function TriggerModal({ repo, presetRef, presetWorkflowId, onClose }: {
     const tuples = (inputs ?? []).map((i) => [i.name, values[i.name] ?? ""] as [string, string]);
     invoke("github_dispatch", { repo, workflow: String(wf.id), gitRef: ref, inputs: tuples })
       .then(() => {
-        const summary = tuples.length ? tuples.map(([k, v]) => `${k}=${v}`).join(", ") : "no inputs";
-        setDone(`Dispatched ${wf.name} on ${ref} — ${summary}`);
+        const summary = tuples.length ? ` — ${tuples.map(([k, v]) => `${k}=${v}`).join(", ")}` : "";
+        setDone(`Dispatched ${wf.name} on ${ref}${summary}`);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setBusy(false));
