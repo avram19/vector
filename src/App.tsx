@@ -3631,6 +3631,7 @@ function TerminalView({
     | { kind: "link"; x: number; y: number; uri: string; linkKind: "url" | "path" }
     | { kind: "selection"; x: number; y: number; text: string };
   const [termMenu, setTermMenu] = useState<TermMenu | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const focusedRef = useRef(focused);
   useEffect(() => { focusedRef.current = focused; }, [focused]);
 
@@ -3960,14 +3961,61 @@ function TerminalView({
     return () => cancelAnimationFrame(id);
   }, [visible, focused]);
 
+  useEffect(() => {
+    let unlistenEnter: (() => void) | undefined;
+    let unlistenLeave: (() => void) | undefined;
+    let unlistenDrop: (() => void) | undefined;
+
+    (async () => {
+      unlistenEnter = await listen<void>('tauri://drag-enter', () => setIsDragging(true));
+      unlistenLeave = await listen<void>('tauri://drag-leave', () => setIsDragging(false));
+      unlistenDrop = await listen<{ paths: string[]; position: { x: number; y: number } }>(
+        'tauri://drag-drop',
+        (e) => {
+          setIsDragging(false);
+          if (!focused || !sessionRef.current) return;
+          const paths = e.payload.paths;
+          if (paths.length === 0) return;
+          const text = paths.map((p) => (/\s/.test(p) ? `"${p}"` : p)).join(' ');
+          invoke('write_stdin', { sessionId: sessionRef.current, data: text }).catch(() => {});
+        }
+      );
+    })();
+
+    return () => {
+      unlistenEnter?.();
+      unlistenLeave?.();
+      unlistenDrop?.();
+    };
+  }, [focused]);
+
   return (
     <>
       <div
         className="term-wrap"
         ref={wrapRef}
-        style={{ display: visible ? "block" : "none" }}
+        style={{ position: 'relative', display: visible ? "block" : "none" }}
         onClick={() => termRef.current?.focus()}
-      />
+      >
+        {isDragging && focused && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(99,102,241,0.12)',
+            border: '2px dashed rgba(99,102,241,0.55)',
+            borderRadius: 4, zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              color: '#a5b4fc', fontSize: 13,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              background: 'rgba(0,0,0,0.55)', padding: '5px 12px', borderRadius: 4,
+            }}>
+              Drop to paste path
+            </span>
+          </div>
+        )}
+      </div>
       {termMenu && (
         <TerminalContextMenu menu={termMenu} onClose={() => setTermMenu(null)} />
       )}
