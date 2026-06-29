@@ -137,7 +137,9 @@ function BooleanMultiSelect({ items, values, onToggle }: {
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [coords, setCoords] = useState<{ left: number; top: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -146,18 +148,26 @@ function BooleanMultiSelect({ items, values, onToggle }: {
     return () => document.removeEventListener("mousedown", onDoc, true);
   }, [open]);
 
+  // Anchor the popover with position:fixed so it escapes the modal's overflow.
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setCoords({ left: r.left, top: r.bottom + 4, width: r.width });
+    setOpen(true);
+  };
+
   const selected = items.filter((i) => values[i.name] === "true").length;
   const ql = q.trim().toLowerCase();
   const filtered = ql ? items.filter((i) => i.name.toLowerCase().includes(ql) || (i.description ?? "").toLowerCase().includes(ql)) : items;
 
   return (
     <div className="gh-combo" ref={ref}>
-      <button type="button" className="gh-combo-trigger" onClick={() => setOpen((v) => !v)}>
+      <button type="button" ref={btnRef} className="gh-combo-trigger" onClick={toggle}>
         <span className={`gh-combo-val${selected ? "" : " placeholder"}`}>{selected ? `${selected} selected` : "None selected"}</span>
         <span className="gh-combo-caret"><Chevron /></span>
       </button>
       {open && (
-        <div className="gh-combo-pop">
+        <div className="gh-combo-pop gh-combo-pop--fixed" style={{ left: coords?.left, top: coords?.top, width: coords?.width }}>
           <input className="gh-combo-search" placeholder="Search options…" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" spellCheck={false} />
           <div className="gh-combo-list">
             {filtered.map((i) => (

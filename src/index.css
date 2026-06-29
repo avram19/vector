@@ -273,6 +273,8 @@ body.theme-light {
 .gh-combo-clear { color: var(--gh-faint); flex: 0 0 auto; cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px; border-radius: 4px; }
 .gh-combo-clear:hover { color: var(--gh-fg); background: var(--gh-hover); }
 .gh-combo-pop { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; background: var(--gh-pop-bg); border: 1px solid var(--gh-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); overflow: hidden; }
+/* Fixed variant: escapes a clipping (overflow) ancestor like the trigger modal. */
+.gh-combo-pop--fixed { position: fixed; right: auto; top: 0; left: 0; z-index: 250; }
 .gh-combo-search { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--gh-border); background: transparent; color: var(--gh-fg); padding: 8px 10px; font-size: 12px; outline: 0; }
 .gh-combo-list { max-height: 260px; overflow: auto; padding: 4px; }
 .gh-combo-opt { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--gh-fg); padding: 6px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
