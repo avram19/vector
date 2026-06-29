@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod client;
+pub mod notifications;
 pub mod prs;
 pub mod repos;
 
@@ -18,9 +19,19 @@ pub struct CachedResponse {
 
 /// In-memory only — never serialized to disk. Holds the ETag response cache and
 /// (in later plans) the activity poller handle.
-#[derive(Default)]
 pub struct GithubState {
     pub cache: parking_lot::Mutex<HashMap<String, CachedResponse>>,
+    /// Window focus — drives the poller cadence (45s focused / 300s unfocused).
+    pub focused: std::sync::atomic::AtomicBool,
+}
+
+impl Default for GithubState {
+    fn default() -> Self {
+        Self {
+            cache: parking_lot::Mutex::new(HashMap::new()),
+            focused: std::sync::atomic::AtomicBool::new(true),
+        }
+    }
 }
 
 #[tauri::command]
@@ -174,4 +185,9 @@ pub async fn github_rerun(_state: State<'_, AppState>, repo: String, run_id: u64
 #[tauri::command]
 pub async fn github_cancel(_state: State<'_, AppState>, repo: String, run_id: u64) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || actions::cancel(&repo, run_id)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn list_github_notifications(_state: State<'_, AppState>) -> Result<Vec<notifications::Notification>, String> {
+    tauri::async_runtime::spawn_blocking(notifications::list_notifications).await.map_err(|e| e.to_string())?
 }

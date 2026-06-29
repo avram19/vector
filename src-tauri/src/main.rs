@@ -827,9 +827,22 @@ fn main() {
             github::github_dispatch,
             github::github_rerun,
             github::github_cancel,
+            github::list_github_notifications,
         ])
         .setup(|app| {
-            let _ = app.get_webview_window("main");
+            github::notifications::spawn_poller(app.handle().clone());
+            if let Some(win) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(focused) = event {
+                        handle
+                            .state::<AppState>()
+                            .github
+                            .focused
+                            .store(*focused, std::sync::atomic::Ordering::Relaxed);
+                    }
+                });
+            }
 
             // Native menu bar. Replacing the default menu loses macOS's built-in
             // items, so we rebuild App / Edit / View / Window / Help explicitly.
