@@ -656,6 +656,7 @@ struct SidebarConfigPatch {
     github_pinned_repos: Option<Vec<String>>,
     github_collapsed_groups: Option<Vec<String>>,
     github_favorited_workflows: Option<Vec<String>>,
+    github_notifications_seen_at: Option<String>,
 }
 
 #[tauri::command]
@@ -672,6 +673,7 @@ async fn update_sidebar_config(state: State<'_, AppState>, patch: SidebarConfigP
     if let Some(v) = patch.github_pinned_repos { cfg.github_pinned_repos = v; }
     if let Some(v) = patch.github_collapsed_groups { cfg.github_collapsed_groups = v; }
     if let Some(v) = patch.github_favorited_workflows { cfg.github_favorited_workflows = v; }
+    if let Some(v) = patch.github_notifications_seen_at { cfg.github_notifications_seen_at = v; }
     config::save_ui_config(&cfg).map_err(|e| e.to_string())
 }
 
