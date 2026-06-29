@@ -1,9 +1,7 @@
 import React, { useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useSidebarState, SidebarTab } from "./sidebarState";
-
-export type GhNotification = { threadId: string; repo: string; number: number; title: string; reason: string; updatedAt: string };
+import { useSidebarState, SidebarTab, GhNotification } from "./sidebarState";
 import { FileViewer } from "./FileViewer";
 import { WorktreesView } from "./WorktreesView";
 import { GithubPanel } from "../github/GithubPanel";
@@ -105,7 +103,10 @@ export function Sidebar({
   if (!hydrated) return null; // avoid flicker on first render
 
   const onIconClick = (tab: SidebarTab) => {
-    if (tab === "github") {
+    const opening = tab !== sidebar_active_tab || sidebar_collapsed;
+    // Mark notifications seen only when the GitHub panel is actually opened,
+    // not when clicking the active icon to collapse it.
+    if (tab === "github" && opening) {
       update({ github_notifications_seen_at: new Date().toISOString() });
     }
     if (tab === sidebar_active_tab && !sidebar_collapsed) {

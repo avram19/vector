@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 // SidebarTab values match the backend's #[serde(rename_all = "lowercase")] enum.
 export type SidebarTab = "files" | "worktrees" | "github";
+export type GhNotification = { threadId: string; repo: string; number: number; title: string; reason: string; updatedAt: string };
 export type WorktreesViewMode = "flat" | "tree";
 
 // UiConfig has no rename_all — Rust serializes fields as snake_case.
