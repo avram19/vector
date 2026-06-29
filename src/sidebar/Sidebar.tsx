@@ -1,5 +1,9 @@
 import React, { useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useSidebarState, SidebarTab } from "./sidebarState";
+
+export type GhNotification = { threadId: string; repo: string; number: number; title: string; reason: string; updatedAt: string };
 import { FileViewer } from "./FileViewer";
 import { WorktreesView } from "./WorktreesView";
 import { GithubPanel } from "../github/GithubPanel";
@@ -80,6 +84,17 @@ export function Sidebar({
   const { state, update, hydrated } = useSidebarState();
   const { sidebar_collapsed, sidebar_active_tab, sidebar_width } = state;
 
+  const [notifications, setNotifications] = React.useState<GhNotification[]>([]);
+
+  React.useEffect(() => {
+    invoke<GhNotification[]>("list_github_notifications").then(setNotifications).catch(() => {});
+    const un = listen<GhNotification[]>("github-activity", (e) => setNotifications(e.payload));
+    return () => { un.then((f) => f()); };
+  }, []);
+
+  const seenAt = state.github_notifications_seen_at;
+  const unreadCount = notifications.filter((n) => n.updatedAt > seenAt).length;
+
   // Expose sidebar offset as a CSS variable on the document root so topbar/shell
   // can shift right without needing prop drilling.
   const offset = RAIL_WIDTH + (sidebar_collapsed ? 0 : sidebar_width);
@@ -90,6 +105,9 @@ export function Sidebar({
   if (!hydrated) return null; // avoid flicker on first render
 
   const onIconClick = (tab: SidebarTab) => {
+    if (tab === "github") {
+      update({ github_notifications_seen_at: new Date().toISOString() });
+    }
     if (tab === sidebar_active_tab && !sidebar_collapsed) {
       update({ sidebar_collapsed: true });
     } else {
@@ -114,7 +132,10 @@ export function Sidebar({
           className={`sidebar-rail-icon${sidebar_active_tab === "github" && !sidebar_collapsed ? " active" : ""}`}
           onClick={() => onIconClick("github")}
           title="GitHub"
-        ><GithubIcon /></button>
+        >
+          <GithubIcon />
+          {unreadCount > 0 && <span className="sidebar-rail-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+        </button>
         <div className="sidebar-rail-spacer" />
         {onOpenSettings && (
           <button
@@ -181,6 +202,7 @@ export function Sidebar({
                 favoritedWorkflows={state.github_favorited_workflows}
                 onFavoritedWorkflows={(next) => update({ github_favorited_workflows: next })}
                 onOpenPreview={onOpenPreview ?? (() => {})}
+                notifications={notifications}
               />
             )}
           </div>

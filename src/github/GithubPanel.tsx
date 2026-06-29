@@ -39,6 +39,7 @@ export function GithubPanel({
   favoritedWorkflows,
   onFavoritedWorkflows,
   onOpenPreview,
+  notifications,
 }: {
   subview: string;
   onSubview: (v: string) => void;
@@ -47,6 +48,7 @@ export function GithubPanel({
   favoritedWorkflows: string[];
   onFavoritedWorkflows: (next: string[]) => void;
   onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
+  notifications: { repo: string; number: number; updatedAt: string }[];
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,7 +124,7 @@ export function GithubPanel({
             onOpenActions={(repo) => { setActionsRepo(repo); onSubview("actions"); }}
           />
         )}
-        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} />}
+        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} notifications={notifications} />}
         {active === "actions" && (
           <ActionsView
             favorites={favoritedWorkflows}

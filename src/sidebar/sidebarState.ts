@@ -19,6 +19,7 @@ export type SidebarState = {
   github_pinned_repos: string[];
   github_collapsed_groups: string[];
   github_favorited_workflows: string[];
+  github_notifications_seen_at: string;
 };
 
 
@@ -34,6 +35,7 @@ const DEFAULT: SidebarState = {
   github_pinned_repos: [],
   github_collapsed_groups: [],
   github_favorited_workflows: [],
+  github_notifications_seen_at: "",
 };
 
 export function useSidebarState() {
