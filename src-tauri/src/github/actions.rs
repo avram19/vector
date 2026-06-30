@@ -204,7 +204,14 @@ pub fn workflow_inputs(repo: &str, path: &str) -> Result<Vec<DispatchInput>, Str
     if let Some(serde_yaml::Value::Mapping(map)) = inputs {
         for (k, spec) in map {
             let name = k.as_str().unwrap_or_default().to_string();
-            if name.is_empty() { continue; }
+            // Only accept conventional input names — they become `inputs[<name>]`
+            // dispatch field keys, so a name with `=`/`[`/`]` would corrupt them.
+            if name.is_empty()
+                || !name.chars().next().map(|c| c.is_ascii_alphabetic() || c == '_').unwrap_or(false)
+                || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                continue;
+            }
             let opts = spec.get("options").and_then(|o| o.as_sequence()).map(|seq| {
                 seq.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect()
             }).unwrap_or_default();

@@ -230,11 +230,6 @@ body.theme-light {
 /* ── GitHub PR inbox ──────────────────────────────────────── */
 .gh-prs { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .gh-pr-list { flex: 1; overflow: auto; min-height: 0; padding: 4px 6px 12px; }
-.gh-chip-btn { appearance: none; -webkit-appearance: none; font-size: 11px; color: var(--gh-muted); background: transparent; border: 1px solid var(--gh-border); border-radius: 20px; padding: 2px 9px; cursor: pointer; flex: 0 0 auto; }
-.gh-chip-btn.on { color: #fff; background: var(--gh-accent-solid); border-color: var(--gh-accent-solid); }
-.gh-pr-bucket { margin-top: 8px; }
-.gh-pr-bucket-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; font-weight: 600; color: var(--gh-fg); cursor: default; }
-.gh-pr-bucket-h.warn { color: #e0913f; }
 .gh-pr-count { margin-left: 4px; color: var(--gh-dim); font-weight: 500; font-size: 11px; }
 .gh-viewmore { display: block; width: calc(100% - 16px); margin: 6px 8px 2px; padding: 6px; background: transparent; border: 1px solid var(--gh-border); border-radius: 7px; color: var(--gh-accent); font-size: 12px; cursor: pointer; }
 .gh-viewmore:hover:not(:disabled) { background: var(--gh-row-hover); }
