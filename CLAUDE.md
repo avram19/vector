@@ -27,16 +27,19 @@ The script builds + signs with `~/.config/vector-updater/private.ke`, reads the 
 
 ## Architecture
 
-**Frontend — `src/App.tsx`** (single file, all UI state)
+**Frontend — `src/App.tsx`** (single file, most UI state)
 - Tabs, per-tab recursive pane tree (`PaneLeaf | PaneSplit`), picker modal, update banner, xterm wiring per pane.
 - xterm.js addons in use: `FitAddon`, `WebLinksAddon`, `Unicode11Addon`. WebGL/Canvas renderers have been tried and removed — they rendered worse on WKWebView. Stay on the DOM renderer.
 - PTY bridge: `invoke("start_session", …)`, subscribe to `pty-data-{sessionId}` and `pty-exit-{sessionId}`, write via `invoke("write_stdin", …)`.
+- `src/sidebar/` — the rail + panel (Files / Worktrees / GitHub tabs); `src/preview/` — preview pane renderers (code/diff/markdown/mermaid/pdf/image); `src/github/` — the GitHub tab (Repos, PR inbox, Actions, notifications badge), all talking to the `github::*` commands.
 
 **Backend — `src-tauri/src/`**
-- `main.rs` — Tauri command handlers + `AppState { registry, config }`. Resolves the agent binary against `augmented_path()` before spawning; sets `TERM=xterm-256color`, `COLORTERM=truecolor`; enables aggressive PTY filtering when `agent_id == "claude"`.
+- `main.rs` — Tauri command handlers + `AppState` (registry, config, profiles, ui_config, `github`, watchers, …). Resolves the agent binary against `augmented_path()` before spawning; sets `TERM=xterm-256color`, `COLORTERM=truecolor`; enables aggressive PTY filtering when `agent_id == "claude"`. `setup()` spawns the GitHub notifications poller.
 - `pty.rs` — PTY spawn/read/write + VT filter + **frame coalescing**. Most load-bearing file; easiest to regress.
-- `config.rs` — Builtin agent list, TOML overrides from `~/.config/vector/config.toml`, and `augmented_path()` which prepends homebrew/cargo/npm/bun dirs because macOS GUI apps start with a minimal PATH.
+- `config.rs` — Builtin agent list, TOML overrides from `~/.config/vector/config.toml`, `augmented_path()` (prepends homebrew/cargo/npm/bun dirs because macOS GUI apps start with a minimal PATH), and the `ui.toml` `UiConfig` (sidebar + all `github_*` taxonomy/seen state).
 - `sessions.rs` — Indexes Claude's `~/.claude/projects/*/*.jsonl` session files for the resume picker. Results cached by path+mtime.
+- `sidebar.rs` — file tree + worktree/diff commands for the sidebar. `git.rs` — worktree/status/diff helpers. `preview.rs` — file/preview commands. `usage.rs` — Claude usage meter. `fs_watch.rs` / `worktree_session.rs` — live file-watch + per-session worktree snapshots.
+- `github/` — the GitHub sidebar backend, all via `gh` through `client.rs` (the single `run_gh` choke point; auth is the user's `gh` login, no tokens stored): `repos.rs`, `prs.rs`, `actions.rs`, `notifications.rs`, and `mod.rs` (`GithubState` + command wrappers). Read-heavy results use an in-memory TTL cache + on-disk SWR cache in `dirs::cache_dir()/vector/`. `serde_yaml` parses `workflow_dispatch` inputs. See `docs/superpowers/specs/2026-06-*-github-*.md` for the design.
 
 ## PTY pipeline (critical — do not regress)
 
