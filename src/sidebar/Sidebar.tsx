@@ -1,7 +1,10 @@
 import React, { useRef } from "react";
-import { useSidebarState, SidebarTab } from "./sidebarState";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useSidebarState, SidebarTab, GhNotification } from "./sidebarState";
 import { FileViewer } from "./FileViewer";
 import { WorktreesView } from "./WorktreesView";
+import { GithubPanel } from "../github/GithubPanel";
 
 const RAIL_WIDTH = 42;
 
@@ -20,6 +23,14 @@ function WorktreesIcon() {
       <circle cx="18" cy="6" r="3" />
       <circle cx="6" cy="18" r="3" />
       <path d="M18 9a9 9 0 0 1-9 9" />
+    </svg>
+  );
+}
+
+function GithubIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.56 2.36 1.11 2.94.85.09-.66.35-1.11.63-1.37-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.27 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.32 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.59.69.49A10.02 10.02 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
     </svg>
   );
 }
@@ -71,6 +82,17 @@ export function Sidebar({
   const { state, update, hydrated } = useSidebarState();
   const { sidebar_collapsed, sidebar_active_tab, sidebar_width } = state;
 
+  const [notifications, setNotifications] = React.useState<GhNotification[]>([]);
+
+  React.useEffect(() => {
+    invoke<GhNotification[]>("list_github_notifications").then(setNotifications).catch(() => {});
+    const un = listen<GhNotification[]>("github-activity", (e) => setNotifications(e.payload));
+    return () => { un.then((f) => f()); };
+  }, []);
+
+  const seenAt = state.github_notifications_seen_at;
+  const unreadCount = notifications.filter((n) => n.updatedAt > seenAt).length;
+
   // Expose sidebar offset as a CSS variable on the document root so topbar/shell
   // can shift right without needing prop drilling.
   const offset = RAIL_WIDTH + (sidebar_collapsed ? 0 : sidebar_width);
@@ -81,6 +103,12 @@ export function Sidebar({
   if (!hydrated) return null; // avoid flicker on first render
 
   const onIconClick = (tab: SidebarTab) => {
+    const opening = tab !== sidebar_active_tab || sidebar_collapsed;
+    // Mark notifications seen only when the GitHub panel is actually opened,
+    // not when clicking the active icon to collapse it.
+    if (tab === "github" && opening) {
+      update({ github_notifications_seen_at: new Date().toISOString() });
+    }
     if (tab === sidebar_active_tab && !sidebar_collapsed) {
       update({ sidebar_collapsed: true });
     } else {
@@ -101,6 +129,14 @@ export function Sidebar({
           onClick={() => onIconClick("worktrees")}
           title="Worktrees"
         ><WorktreesIcon /></button>
+        <button
+          className={`sidebar-rail-icon${sidebar_active_tab === "github" && !sidebar_collapsed ? " active" : ""}`}
+          onClick={() => onIconClick("github")}
+          title="GitHub"
+        >
+          <GithubIcon />
+          {unreadCount > 0 && <span className="sidebar-rail-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+        </button>
         <div className="sidebar-rail-spacer" />
         {onOpenSettings && (
           <button
@@ -115,8 +151,10 @@ export function Sidebar({
       {!sidebar_collapsed && (
         <div className="sidebar-panel" style={{ width: sidebar_width }}>
           <div className="sidebar-panel-header">
-            <span className="sidebar-panel-title" title={projectRoot ?? ""}>
-              {projectRoot ? basename(projectRoot) : (sidebar_active_tab === "files" ? "Files" : "Worktrees")}
+            <span className="sidebar-panel-title" title={sidebar_active_tab === "github" ? "" : (projectRoot ?? "")}>
+              {sidebar_active_tab === "github"
+                ? "GitHub"
+                : (projectRoot ? basename(projectRoot) : (sidebar_active_tab === "files" ? "Files" : "Worktrees"))}
             </span>
             {sidebar_active_tab === "files" && (
               <button
@@ -149,6 +187,23 @@ export function Sidebar({
                 pinnedPaths={pinnedPaths}
                 pinEnabled={pinEnabled}
                 onTogglePin={onTogglePin}
+              />
+            )}
+            {sidebar_active_tab === "github" && (
+              <GithubPanel
+                subview={state.github_subview}
+                onSubview={(v) => update({ github_subview: v })}
+                repoState={{
+                  pinned: state.github_pinned_repos,
+                  customGroups: state.github_custom_groups,
+                  repoGroup: state.github_repo_group,
+                  collapsed: state.github_collapsed_groups,
+                }}
+                onRepoUpdate={(patch) => update(patch)}
+                favoritedWorkflows={state.github_favorited_workflows}
+                onFavoritedWorkflows={(next) => update({ github_favorited_workflows: next })}
+                onOpenPreview={onOpenPreview ?? (() => {})}
+                notifications={notifications}
               />
             )}
           </div>

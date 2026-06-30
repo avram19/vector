@@ -136,3 +136,210 @@
 .theme-light .pane-shell-panel { background: var(--term-bg, #f5f5f5); }
 .theme-light .pane-shell-header { background: var(--elev, #eee8d5); color: rgba(60, 60, 70, 0.85); border-bottom-color: var(--border, rgba(0, 0, 0, 0.12)); }
 .theme-light .pane-shell-header__close:hover { color: #000; }
+
+/* ── GitHub panel ─────────────────────────────────────────── */
+/* Self-contained theme tokens: the app's global --fg/--muted/etc. are never
+   defined (callers rely on dark fallbacks), so the GitHub panel carries its
+   own. Dark is the default on :root; body.theme-light overrides for Solarized. */
+:root {
+  --gh-fg: #e1e1eb;
+  --gh-muted: rgba(170,172,190,0.62);
+  --gh-faint: rgba(170,172,190,0.45);
+  --gh-dim: rgba(170,172,190,0.35);
+  --gh-border: rgba(128,128,128,0.18);
+  --gh-hover: rgba(128,128,128,0.18);
+  --gh-row-hover: rgba(128,128,128,0.12);
+  --gh-input-bg: rgba(0,0,0,0.25);
+  --gh-pill-bg: #2d3a52;
+  --gh-pill-fg: #7aa7e0;
+  --gh-accent: #7aa7e0;
+  --gh-accent-solid: #3a5f8a;
+  --gh-star: #d9a23a;
+  --gh-link: #58a6ff;
+  --gh-pop-bg: #1d1d27;
+}
+body.theme-light {
+  --gh-fg: #33404a;
+  --gh-muted: rgba(74,86,98,0.88);
+  --gh-faint: rgba(84,96,108,0.62);
+  --gh-dim: rgba(84,96,108,0.45);
+  --gh-border: rgba(0,0,0,0.14);
+  --gh-hover: rgba(0,0,0,0.07);
+  --gh-row-hover: rgba(0,0,0,0.06);
+  --gh-input-bg: rgba(255,255,255,0.6);
+  --gh-pill-bg: #d3e2f3;
+  --gh-pill-fg: #1c4f86;
+  --gh-accent: #1f6feb;
+  --gh-accent-solid: #1f6feb;
+  --gh-star: #b58900;
+  --gh-link: #1f6feb;
+  --gh-pop-bg: #fbf4e3;
+}
+.gh-empty { padding: 16px; color: var(--gh-muted); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 13px; }
+.gh-empty a { color: var(--gh-link); }
+.gh-empty b { color: var(--gh-fg); }
+.gh-retry { background: var(--gh-hover); border: 0; color: var(--gh-fg); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.gh-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.gh-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 6px; }
+.gh-who { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--gh-muted); }
+.gh-who b { color: var(--gh-fg); }
+.gh-av { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg,#3a5f8a,#a371f7); }
+.gh-muted { color: var(--gh-muted); }
+.gh-icobtn { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--gh-faint); border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 0; flex: 0 0 auto; }
+.gh-icobtn:hover { background: var(--gh-hover); color: var(--gh-fg); }
+.gh-icobtn svg { display: block; }
+.gh-search-ico { color: var(--gh-faint); flex: 0 0 auto; display: inline-flex; align-items: center; }
+.gh-dots { display: inline-flex; gap: 3px; align-items: center; flex: 0 0 auto; }
+.gh-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--gh-accent); animation: gh-dots 1s infinite ease-in-out; }
+.gh-dots span:nth-child(2) { animation-delay: 0.15s; }
+.gh-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes gh-dots { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+.gh-subtabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--gh-border); }
+.gh-subtab { appearance: none; -webkit-appearance: none; border-radius: 0; padding: 6px 11px; font-size: 12px; color: var(--gh-muted); border: 0; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; }
+.gh-subtab:hover { color: var(--gh-fg); }
+.gh-subtab.active { color: var(--gh-fg); border-bottom-color: var(--gh-accent); }
+.gh-subbody { flex: 1; overflow: auto; min-height: 0; }
+.gh-placeholder { padding: 16px; color: var(--gh-faint); font-size: 12px; }
+
+/* ── GitHub repos tree ────────────────────────────────────── */
+.gh-repos { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.gh-search { display: flex; align-items: center; gap: 6px; margin: 4px 0 4px; padding: 4px 12px 8px; background: transparent; border: 0; border-bottom: 1px solid var(--gh-border); color: var(--gh-faint); }
+.gh-search input { flex: 1; border: 0; background: transparent; color: var(--gh-fg); outline: 0; font-size: 12px; }
+.gh-tree { flex: 1; overflow: auto; min-height: 0; padding: 2px 6px 12px; }
+.gh-grp { margin-top: 4px; }
+.gh-grp-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; color: var(--gh-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; user-select: none; }
+.gh-grp-h:hover { color: var(--gh-fg); }
+.gh-caret { color: var(--gh-faint); width: 10px; }
+.gh-star { color: var(--gh-star); }
+.gh-grp-tag { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--gh-dim); font-size: 10px; }
+.gh-grp-empty { padding: 4px 6px 4px 22px; color: var(--gh-dim); font-size: 11px; }
+.gh-repo-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 22px; border-radius: 7px; cursor: pointer; }
+.gh-repo-row:hover { background: var(--gh-row-hover); }
+.gh-glyph { color: var(--gh-faint); width: 14px; text-align: center; flex: 0 0 14px; font-size: 11px; }
+.gh-repo-name { color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.gh-own { color: var(--gh-muted); }
+.gh-repo-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--gh-faint); font-size: 11px; flex: 0 0 auto; }
+.gh-pin { color: var(--gh-star); cursor: pointer; flex: 0 0 auto; }
+.gh-pill { background: var(--gh-pill-bg); color: var(--gh-pill-fg); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px; }
+.gh-archived { font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--gh-faint); border: 1px solid var(--gh-border); padding: 0 5px; border-radius: 9px; }
+.gh-newgrp { display: flex; gap: 6px; padding: 6px 10px; }
+.gh-newgrp input { flex: 1; background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; color: var(--gh-fg); padding: 4px 7px; font-size: 12px; outline: 0; }
+.gh-newgrp button { background: var(--gh-hover); border: 0; color: var(--gh-fg); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+.gh-time { color: var(--gh-dim); font-size: 10px; }
+
+/* ── GitHub PR inbox ──────────────────────────────────────── */
+.gh-prs { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.gh-pr-list { flex: 1; overflow: auto; min-height: 0; padding: 4px 6px 12px; }
+.gh-pr-count { margin-left: 4px; color: var(--gh-dim); font-weight: 500; font-size: 11px; }
+.gh-viewmore { display: block; width: calc(100% - 16px); margin: 6px 8px 2px; padding: 6px; background: transparent; border: 1px solid var(--gh-border); border-radius: 7px; color: var(--gh-accent); font-size: 12px; cursor: pointer; }
+.gh-viewmore:hover:not(:disabled) { background: var(--gh-row-hover); }
+.gh-viewmore:disabled { color: var(--gh-faint); cursor: default; }
+.gh-pr-row { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.gh-pr-row:hover { background: var(--gh-row-hover); }
+.gh-pr-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.gh-ci-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.gh-ci-dot.ci-pass { background: #2ea043; }
+.gh-ci-dot.ci-fail { background: #f85149; }
+.gh-ci-dot.ci-run { background: #d9a23a; }
+.gh-ci-dot.ci-none { background: var(--gh-faint); }
+.gh-pr-num { color: var(--gh-faint); font-variant-numeric: tabular-nums; flex: 0 0 auto; font-size: 12px; }
+.gh-pr-title { color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12.5px; }
+.gh-pr-bot { display: flex; align-items: center; gap: 7px; padding-left: 16px; flex-wrap: wrap; }
+.gh-pr-repo { color: var(--gh-muted); font-size: 11px; }
+.gh-pr-spacer { flex: 1 1 auto; }
+.gh-pr-chip { font-size: 10px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--gh-border); color: var(--gh-muted); }
+.gh-pr-chip.conflict { color: #f85149; border-color: rgba(248,81,73,0.4); }
+.gh-pr-chip.req { color: #e0913f; border-color: rgba(224,145,63,0.4); }
+.gh-pr-chip.ok { color: #2ea043; border-color: rgba(46,160,67,0.4); }
+.gh-pr-chip.draft { color: var(--gh-faint); }
+.gh-pr-avatar { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; }
+.gh-pr-avatar--fallback { display: inline-grid; place-items: center; font-size: 8px; font-weight: 700; color: var(--gh-fg); background: var(--gh-hover); }
+.gh-pr-time { color: var(--gh-dim); font-size: 10px; flex: 0 0 auto; }
+.gh-pill-btn { appearance: none; -webkit-appearance: none; border: 0; cursor: pointer; font: inherit; }
+.gh-pill-btn:hover { filter: brightness(1.15); }
+.gh-pr-repofilter { padding: 4px 10px 6px; display: flex; align-items: center; gap: 6px; }
+/* searchable repo combobox */
+.gh-combo { position: relative; flex: 1; min-width: 0; }
+.gh-combo-trigger { width: 100%; display: flex; align-items: center; gap: 6px; background: var(--gh-input-bg); color: var(--gh-fg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer; }
+.gh-combo-trigger:hover { border-color: var(--gh-faint); }
+.gh-combo-val { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.gh-combo-val.placeholder { color: var(--gh-muted); }
+.gh-combo-caret { color: var(--gh-faint); flex: 0 0 auto; display: inline-flex; align-items: center; }
+.gh-combo-clear { color: var(--gh-faint); flex: 0 0 auto; cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px; border-radius: 4px; }
+.gh-combo-clear:hover { color: var(--gh-fg); background: var(--gh-hover); }
+.gh-combo-pop { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; background: var(--gh-pop-bg); border: 1px solid var(--gh-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); overflow: hidden; }
+/* Fixed variant: escapes a clipping (overflow) ancestor like the trigger modal. */
+.gh-combo-pop--fixed { position: fixed; right: auto; top: 0; left: 0; z-index: 250; }
+.gh-combo-search { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--gh-border); background: transparent; color: var(--gh-fg); padding: 8px 10px; font-size: 12px; outline: 0; }
+.gh-combo-list { max-height: 260px; overflow: auto; padding: 4px; }
+.gh-combo-opt { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--gh-fg); padding: 6px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-combo-opt:hover, .gh-combo-opt.active { background: var(--gh-row-hover); }
+.gh-combo-opt.sel { background: var(--gh-hover); font-weight: 600; }
+.gh-combo-empty { padding: 8px; color: var(--gh-faint); font-size: 12px; }
+.gh-ms-opt { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; color: var(--gh-fg); cursor: pointer; border-radius: 6px; }
+.gh-ms-opt:hover { background: var(--gh-row-hover); }
+.gh-ms-opt input { flex: 0 0 auto; margin: 0; }
+.gh-pr-section.level-0 { margin-top: 6px; }
+.gh-pr-section.level-1 { margin-top: 2px; }
+.gh-pr-section-h { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: pointer; user-select: none; }
+.gh-pr-section.level-0 > .gh-pr-section-h { font-size: 12px; font-weight: 700; color: var(--gh-fg); text-transform: uppercase; letter-spacing: 0.03em; }
+.gh-pr-section.level-1 > .gh-pr-section-h { font-size: 11px; font-weight: 600; color: var(--gh-muted); }
+.gh-pr-section.level-1 > .gh-pr-section-body { padding-left: 8px; }
+.gh-pr-chip.merged { color: #a371f7; border-color: rgba(163,113,247,0.4); }
+.gh-pr-chip.closed { color: var(--gh-faint); border-color: var(--gh-border); }
+
+/* ── GitHub Actions ───────────────────────────────────────── */
+.gh-actions { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: auto; padding-bottom: 12px; }
+.gh-actions-err { margin: 6px 10px; padding: 6px 8px; font-size: 11px; color: #f85149; border: 1px solid rgba(248,81,73,0.4); border-radius: 6px; cursor: pointer; }
+.gh-act-section { margin-top: 8px; }
+.gh-act-h { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--gh-muted); }
+.gh-fav { margin: 4px 8px; padding: 7px 9px; border: 1px solid var(--gh-border); border-radius: 8px; }
+.gh-fav-top { display: flex; align-items: flex-start; gap: 8px; }
+.gh-fav-title { flex: 1; min-width: 0; cursor: pointer; }
+.gh-fav-repo { display: block; font-size: 11px; color: var(--gh-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-fav-wf { display: block; font-size: 13px; font-weight: 600; color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-fav-run { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--gh-faint); cursor: pointer; }
+.gh-run { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; cursor: pointer; }
+.gh-run:hover { background: var(--gh-row-hover); }
+.gh-run-wrap { padding-left: 14px; }
+.gh-run-main { min-width: 0; flex: 1; }
+.gh-run-l1 { display: flex; gap: 6px; align-items: baseline; color: var(--gh-fg); font-size: 12.5px; }
+.gh-run-wf { font-weight: 600; }
+.gh-run-n { color: var(--gh-faint); font-size: 11px; }
+.gh-run-title { color: var(--gh-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-run-l2 { color: var(--gh-faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-run-repo { color: var(--gh-muted); }
+.gh-run-branch { color: var(--gh-accent); }
+.gh-run-ico { flex: 0 0 auto; width: 14px; text-align: center; font-size: 12px; }
+.gh-run-ico.ok { color: #2ea043; }
+.gh-run-ico.bad { color: #f85149; }
+.gh-run-ico.dim { color: var(--gh-faint); }
+.gh-run-spin { flex: 0 0 auto; width: 11px; height: 11px; border: 2px solid var(--gh-border); border-top-color: var(--gh-accent); border-radius: 50%; animation: gh-spin 0.8s linear infinite; }
+@keyframes gh-spin { to { transform: rotate(360deg); } }
+.gh-wf { margin: 0 4px; }
+.gh-wf-h { display: flex; align-items: center; gap: 6px; padding: 6px 6px; border-radius: 7px; cursor: pointer; }
+.gh-wf-h:hover { background: var(--gh-row-hover); }
+.gh-wf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gh-fg); font-size: 12.5px; }
+.gh-job { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 28px; font-size: 12px; color: var(--gh-muted); }
+.gh-job-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-job-log { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-accent); border-radius: 6px; padding: 1px 8px; font-size: 11px; cursor: pointer; flex: 0 0 auto; }
+.gh-job-log:hover { background: var(--gh-row-hover); }
+.gh-job-running { color: var(--gh-faint); font-size: 11px; flex: 0 0 auto; }
+
+/* ── GitHub trigger modal ─────────────────────────────────── */
+.gh-modal-backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; }
+.gh-modal { width: 380px; max-width: 90vw; max-height: 85vh; overflow: auto; background: var(--gh-pop-bg); border: 1px solid var(--gh-border); border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.gh-modal-h { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--gh-border); font-size: 13px; font-weight: 600; color: var(--gh-fg); }
+.gh-modal-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.gh-field { display: flex; flex-direction: column; gap: 4px; }
+.gh-field > span { font-size: 11px; color: var(--gh-muted); }
+.gh-field input, .gh-field select { background: var(--gh-input-bg); color: var(--gh-fg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 5px 8px; font-size: 12px; outline: 0; }
+.gh-modal-run { background: var(--gh-accent-solid); color: #fff; border: 0; border-radius: 7px; padding: 7px 12px; font-size: 12px; cursor: pointer; }
+.gh-modal-run:disabled { opacity: 0.5; cursor: default; }
+.gh-modal-ok { color: #2ea043; font-size: 12px; }
+.gh-run-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.gh-pr-deploy { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-accent); border-radius: 6px; padding: 0 7px; font-size: 10px; cursor: pointer; flex: 0 0 auto; }
+.gh-pr-deploy:hover { background: var(--gh-row-hover); }
+.sidebar-rail-icon { position: relative; }
+.sidebar-rail-badge { position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: #d9483b; color: #fff; font-size: 9px; font-weight: 700; line-height: 15px; text-align: center; }
+.gh-pr-unread { width: 7px; height: 7px; border-radius: 50%; background: var(--gh-accent); flex: 0 0 auto; }

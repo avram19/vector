@@ -17,6 +17,7 @@ not a shell prompt.
   - [Pane splits](#pane-splits)
   - [File Previewer](#file-previewer)
   - [Sidebar — files & worktrees](#sidebar--files--worktrees)
+  - [GitHub — repos, pull requests & actions](#github--repos-pull-requests--actions)
   - [Resume Claude sessions](#resume-claude-sessions)
   - [Auto-detect installed agents](#auto-detect-installed-agents)
   - [Project picker](#project-picker)
@@ -61,6 +62,16 @@ A collapsible sidebar with two tabs, both scoped to the focused tab's project:
 - **Worktrees** — every git repo discovered under the project, grouped by repo. Each worktree expands to show **Uncommitted** and **Committed (vs base)** changes. Click a change to open a unified diff with syntax highlighting in the preview pane. Toggle between flat and tree views from the search bar; both persist across restarts. Right-click a worktree for Reveal / Open / Open in editor.
 
 Sidebar width, active tab, collapsed state, hidden-files toggle, and worktrees view mode all persist via `~/.config/vector/ui.toml`.
+
+### GitHub — repos, pull requests & actions
+
+A third sidebar tab that turns Vector into a GitHub cockpit, authenticated through your existing `gh` CLI login (no tokens stored — it inherits your exact scopes and org SSO). Three sub-tabs:
+
+- **Repos** — every repo you can see, auto-grouped by org with your own custom groups, a Favorites section, pin/drag-to-group/right-click actions, and search. Archived repos are hidden until you search. Renders instantly from an on-disk cache, then refreshes. Click a repo's PR-count badge to jump to its pull requests; right-click → **Open Actions**.
+- **Pull Requests** — an account-wide inbox split into **My Pull Requests** (Needs Action / Ready to Merge / Waiting / Done) and **Team Pull Requests** (review-requested), with CI/review/conflict/merged/closed badges, a searchable repo filter, search by title or number, "View more" paging, and an unread-activity dot. A **Deploy** button on any PR opens the workflow trigger prefilled with that PR's branch.
+- **Actions** — a favorited-workflows dashboard across repos plus per-repo drill-down (workflows → runs → jobs); open a finished job's logs in the preview pane, **re-run** / **re-run failed** / **cancel** a run, or **trigger** a `workflow_dispatch` with a typed input form (boolean inputs collapse into one searchable multi-select).
+
+The GitHub rail icon shows a badge for unread activity on PRs you authored or were asked to review (in-app only — no system notifications); it clears when you open the tab. Groups, pins, favorited workflows, and seen-state persist in `~/.config/vector/ui.toml`.
 
 ### Resume Claude sessions
 

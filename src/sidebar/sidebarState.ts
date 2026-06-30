@@ -2,7 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
 // SidebarTab values match the backend's #[serde(rename_all = "lowercase")] enum.
-export type SidebarTab = "files" | "worktrees";
+export type SidebarTab = "files" | "worktrees" | "github";
+export type GhNotification = { threadId: string; repo: string; number: number; title: string; reason: string; updatedAt: string };
 export type WorktreesViewMode = "flat" | "tree";
 
 // UiConfig has no rename_all — Rust serializes fields as snake_case.
@@ -13,6 +14,13 @@ export type SidebarState = {
   sidebar_width: number;
   show_hidden_files: boolean;
   worktrees_view_mode: WorktreesViewMode;
+  github_subview: string;
+  github_custom_groups: string[];
+  github_repo_group: Record<string, string>;
+  github_pinned_repos: string[];
+  github_collapsed_groups: string[];
+  github_favorited_workflows: string[];
+  github_notifications_seen_at: string;
 };
 
 
@@ -22,6 +30,13 @@ const DEFAULT: SidebarState = {
   sidebar_width: 240,
   show_hidden_files: false,
   worktrees_view_mode: "flat",
+  github_subview: "repos",
+  github_custom_groups: [],
+  github_repo_group: {},
+  github_pinned_repos: [],
+  github_collapsed_groups: [],
+  github_favorited_workflows: [],
+  github_notifications_seen_at: "",
 };
 
 export function useSidebarState() {

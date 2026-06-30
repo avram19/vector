@@ -3,6 +3,7 @@
 mod config;
 mod fs_watch;
 mod git;
+mod github;
 mod preview;
 mod pty;
 mod sessions;
@@ -20,6 +21,7 @@ struct AppState {
     config: parking_lot::Mutex<config::Config>,
     profiles: parking_lot::Mutex<config::ProfilesFile>,
     ui_config: parking_lot::Mutex<config::UiConfig>,
+    github: github::GithubState,
     watchers: parking_lot::Mutex<std::collections::HashMap<String, fs_watch::WatcherHandle>>,
     session_snapshots: parking_lot::Mutex<std::collections::HashMap<String, worktree_session::Snapshot>>,
     session_manual_pins: parking_lot::Mutex<std::collections::HashMap<String, std::collections::HashSet<std::path::PathBuf>>>,
@@ -648,6 +650,13 @@ struct SidebarConfigPatch {
     sidebar_width: Option<u32>,
     show_hidden_files: Option<bool>,
     worktrees_view_mode: Option<config::WorktreesViewMode>,
+    github_subview: Option<String>,
+    github_custom_groups: Option<Vec<String>>,
+    github_repo_group: Option<std::collections::BTreeMap<String, String>>,
+    github_pinned_repos: Option<Vec<String>>,
+    github_collapsed_groups: Option<Vec<String>>,
+    github_favorited_workflows: Option<Vec<String>>,
+    github_notifications_seen_at: Option<String>,
 }
 
 #[tauri::command]
@@ -658,6 +667,13 @@ async fn update_sidebar_config(state: State<'_, AppState>, patch: SidebarConfigP
     if let Some(w) = patch.sidebar_width { cfg.sidebar_width = w.clamp(160, 600); }
     if let Some(v) = patch.show_hidden_files { cfg.show_hidden_files = v; }
     if let Some(v) = patch.worktrees_view_mode { cfg.worktrees_view_mode = v; }
+    if let Some(v) = patch.github_subview { cfg.github_subview = v; }
+    if let Some(v) = patch.github_custom_groups { cfg.github_custom_groups = v; }
+    if let Some(v) = patch.github_repo_group { cfg.github_repo_group = v; }
+    if let Some(v) = patch.github_pinned_repos { cfg.github_pinned_repos = v; }
+    if let Some(v) = patch.github_collapsed_groups { cfg.github_collapsed_groups = v; }
+    if let Some(v) = patch.github_favorited_workflows { cfg.github_favorited_workflows = v; }
+    if let Some(v) = patch.github_notifications_seen_at { cfg.github_notifications_seen_at = v; }
     config::save_ui_config(&cfg).map_err(|e| e.to_string())
 }
 
@@ -769,6 +785,7 @@ fn main() {
             config: parking_lot::Mutex::new(config::load()),
             profiles: parking_lot::Mutex::new(config::load_profiles()),
             ui_config: parking_lot::Mutex::new(config::load_ui_config()),
+            github: github::GithubState::default(),
             watchers: parking_lot::Mutex::new(std::collections::HashMap::new()),
             session_snapshots: parking_lot::Mutex::new(std::collections::HashMap::new()),
             session_manual_pins: parking_lot::Mutex::new(std::collections::HashMap::new()),
@@ -793,9 +810,41 @@ fn main() {
             sidebar::installed_editors,
             sidebar::open_in_editor,
             read_agent_cwd,
+            github::gh_auth_status,
+            github::list_github_repos_page,
+            github::set_cached_github_repos,
+            github::get_cached_github_repos,
+            github::list_github_my_prs,
+            github::get_cached_github_my_prs,
+            github::list_github_team_prs,
+            github::get_cached_github_team_prs,
+            github::list_github_repo_prs,
+            github::list_github_workflows,
+            github::list_github_runs,
+            github::list_github_jobs,
+            github::list_github_favorite_runs,
+            github::get_github_job_log,
+            github::prepare_github_job_log,
+            github::github_workflow_inputs,
+            github::github_dispatch,
+            github::github_rerun,
+            github::github_cancel,
+            github::list_github_notifications,
         ])
         .setup(|app| {
-            let _ = app.get_webview_window("main");
+            github::notifications::spawn_poller(app.handle().clone());
+            if let Some(win) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(focused) = event {
+                        handle
+                            .state::<AppState>()
+                            .github
+                            .focused
+                            .store(*focused, std::sync::atomic::Ordering::Relaxed);
+                    }
+                });
+            }
 
             // Native menu bar. Replacing the default menu loses macOS's built-in
             // items, so we rebuild App / Edit / View / Window / Help explicitly.
