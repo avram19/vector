@@ -12,12 +12,11 @@ use crate::AppState;
 /// A cached `gh api` response. Reserved for Plans 1–4 (repos/PRs/actions); the
 /// foundation only constructs the empty map.
 pub struct CachedResponse {
-    pub etag: Option<String>,
     pub body: String,
     pub fetched_at: std::time::Instant,
 }
 
-/// In-memory only — never serialized to disk. Holds the ETag response cache and
+/// In-memory only — never serialized to disk. Holds the response cache and
 /// (in later plans) the activity poller handle.
 pub struct GithubState {
     pub cache: parking_lot::Mutex<HashMap<String, CachedResponse>>,
@@ -90,7 +89,7 @@ pub async fn list_github_my_prs(
     }
     let fresh = tauri::async_runtime::spawn_blocking(prs::list_my_prs).await.map_err(|e| e.to_string())??;
     if let Ok(body) = serde_json::to_string(&fresh) {
-        state.github.cache.lock().insert("my_prs".to_string(), CachedResponse { etag: None, body, fetched_at: std::time::Instant::now() });
+        state.github.cache.lock().insert("my_prs".to_string(), CachedResponse { body, fetched_at: std::time::Instant::now() });
     }
     let to_disk = fresh.clone();
     let _ = tauri::async_runtime::spawn_blocking(move || prs::write_my_prs_cache(&to_disk)).await;
