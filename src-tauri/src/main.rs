@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clipboard;
 mod config;
 mod fs_watch;
 mod git;
@@ -810,6 +811,7 @@ fn main() {
             sidebar::installed_editors,
             sidebar::open_in_editor,
             read_agent_cwd,
+            clipboard::read_clipboard_file_paths,
             github::gh_auth_status,
             github::list_github_repos_page,
             github::set_cached_github_repos,

@@ -3577,6 +3577,22 @@ function Divider({ info, onResize }: { info: DividerInfo; onResize: (splitId: st
   return <div className={`divider divider-${direction}`} style={style} onMouseDown={onDown} />;
 }
 
+/** Single-quote a path so it survives intact when written into an agent/shell
+ *  input line — wraps in single quotes and escapes embedded single quotes as
+ *  `'\''`. Safe against spaces and shell metacharacters (`$`, backtick, `\`). */
+function shellQuotePath(p: string): string {
+  return `'${p.replace(/'/g, "'\\''")}'`;
+}
+
+/** Format dropped/pasted file paths for stdin: each quoted, space-separated. */
+function pathsToStdin(paths: string[]): string {
+  return paths.map(shellQuotePath).join(" ");
+}
+
+/** Image file extensions we leave to the agent's own image paste (e.g. Claude
+ *  Code's `[Image #N]`) rather than inserting as a path. */
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|tiff?|heic|heif|svg)$/i;
+
 function TerminalView({
   tabId,
   paneId,
@@ -3631,8 +3647,41 @@ function TerminalView({
     | { kind: "link"; x: number; y: number; uri: string; linkKind: "url" | "path" }
     | { kind: "selection"; x: number; y: number; text: string };
   const [termMenu, setTermMenu] = useState<TermMenu | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const focusedRef = useRef(focused);
   useEffect(() => { focusedRef.current = focused; }, [focused]);
+  const visibleRef = useRef(visible);
+  useEffect(() => { visibleRef.current = visible; }, [visible]);
+
+  // Finder drag-and-drop: Tauri intercepts OS file drags (HTML5 DataTransfer
+  // can't see full paths in WKWebView, hence `dragDropEnabled: true`) and emits
+  // window-level events. Every mounted pane subscribes, so we act only when
+  // this pane is the visible+focused one — otherwise a background tab's pane
+  // would also fire. Mirrors the paste path — both go through `pathsToStdin`.
+  useEffect(() => {
+    let disposed = false;
+    let unlistenEnter: UnlistenFn | null = null;
+    let unlistenLeave: UnlistenFn | null = null;
+    let unlistenDrop: UnlistenFn | null = null;
+    const active = () => visibleRef.current && focusedRef.current;
+    (async () => {
+      unlistenEnter = await listen("tauri://drag-enter", () => { if (active()) setIsDragging(true); });
+      unlistenLeave = await listen("tauri://drag-leave", () => setIsDragging(false));
+      unlistenDrop = await listen<{ paths: string[] }>("tauri://drag-drop", (e) => {
+        setIsDragging(false);
+        if (!active()) return;
+        const sid = sessionRef.current;
+        const paths = e.payload?.paths ?? [];
+        if (!sid || paths.length === 0) return;
+        invoke("write_stdin", { sessionId: sid, data: pathsToStdin(paths) }).catch(() => {});
+      });
+      // StrictMode (and any fast unmount) can run cleanup before these awaits
+      // resolve; unsubscribe immediately if that happened, or the listener leaks
+      // and drops fire twice.
+      if (disposed) { unlistenEnter?.(); unlistenLeave?.(); unlistenDrop?.(); }
+    })();
+    return () => { disposed = true; unlistenEnter?.(); unlistenLeave?.(); unlistenDrop?.(); };
+  }, []);
 
   useEffect(() => { if (termRef.current) termRef.current.options.theme = theme; }, [theme]);
 
@@ -3767,6 +3816,32 @@ function TerminalView({
       }
     };
     wrapRef.current.addEventListener("contextmenu", onContextMenu);
+
+    // Paste of a copied file (Finder): insert its path, the copy-paste analog of
+    // drag-drop. We intercept ONLY when a non-image file is on the clipboard and
+    // swallow the event so the paste never reaches the agent — otherwise Claude
+    // Code independently reads the clipboard image (a PDF/preview) and adds a
+    // spurious `[Image #N]` alongside our path. Plain text and real images
+    // (screenshots) have no non-image file item, so they fall through untouched
+    // to xterm / the agent's native paste. Capture phase runs before xterm's own
+    // textarea handler. Full paths aren't in the DataTransfer, so we read them
+    // natively via `read_clipboard_file_paths`.
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData ? Array.from(e.clipboardData.items) : [];
+      const hasNonImageFile = items.some((it) => it.kind === "file" && !it.type.startsWith("image/"));
+      if (!hasNonImageFile) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void (async () => {
+        try {
+          const paths = (await invoke<string[]>("read_clipboard_file_paths")).filter((p) => !IMAGE_EXT.test(p));
+          if (paths.length > 0) {
+            invoke("write_stdin", { sessionId, data: pathsToStdin(paths) }).catch(() => {});
+          }
+        } catch {}
+      })();
+    };
+    wrapRef.current.addEventListener("paste", onPaste, true);
 
     const sessionId = crypto.randomUUID();
     sessionRef.current = sessionId;
@@ -3940,6 +4015,7 @@ function TerminalView({
       window.removeEventListener("focus", onWinFocus);
       document.removeEventListener("keydown", onDocKey, true);
       wrapRef.current?.removeEventListener("contextmenu", onContextMenu);
+      wrapRef.current?.removeEventListener("paste", onPaste, true);
       unlistenData?.();
       unlistenExit?.();
       unlistenNotify?.();
@@ -3965,9 +4041,27 @@ function TerminalView({
       <div
         className="term-wrap"
         ref={wrapRef}
-        style={{ display: visible ? "block" : "none" }}
+        style={{ position: "relative", display: visible ? "block" : "none" }}
         onClick={() => termRef.current?.focus()}
-      />
+      >
+        {isDragging && focused && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 50,
+            background: "rgba(99,102,241,0.12)",
+            border: "2px dashed rgba(99,102,241,0.55)",
+            borderRadius: 4, pointerEvents: "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <span style={{
+              color: "#a5b4fc", fontSize: 13,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+              background: "rgba(0,0,0,0.55)", padding: "5px 12px", borderRadius: 4,
+            }}>
+              Drop to paste path
+            </span>
+          </div>
+        )}
+      </div>
       {termMenu && (
         <TerminalContextMenu menu={termMenu} onClose={() => setTermMenu(null)} />
       )}
