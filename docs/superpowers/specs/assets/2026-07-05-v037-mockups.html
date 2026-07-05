@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vector — v0.3.7 mockups</title>
+<style>
+  :root{
+    --bg:#0c0c12; --elev:#14141c; --elev-hi:#1c1c26; --elev-hi2:#242430; --term-bg:#000;
+    --fg:rgba(225,225,235,0.92); --muted:rgba(170,172,190,0.62); --faint:rgba(170,172,190,0.4);
+    --border:rgba(128,128,140,0.18); --border-hi:rgba(128,128,150,0.32);
+    --accent:#3a5f8a; --accent-fg:#7aa7e0;
+    --green:#2ea043; --red:#f85149; --yellow:#d9a23a; --purple:#a371f7; --link:#58a6ff;
+    --badge:#2d3a52;
+    --add:#1a4d2e; --add-fg:#5fd98a; --del:#5a1e22; --del-fg:#f596a0;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;font-size:13px;}
+  .win{height:100vh;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+
+  /* ===== scene switcher (mockup-nav only, not part of Vector's UI) ===== */
+  .scenebar{flex:0 0 40px;display:flex;align-items:center;gap:4px;padding:0 10px;background:#000;
+    border-bottom:1px solid var(--border-hi)}
+  .scenebar .lbl{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-right:6px}
+  .scenebtn{font-size:11.5px;color:var(--muted);background:var(--elev);border:1px solid var(--border);border-radius:20px;
+    padding:5px 13px;cursor:pointer}
+  .scenebtn:hover{color:var(--fg);border-color:var(--border-hi)}
+  .scenebtn.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .scene{display:none;flex:1;min-height:0}
+  .scene.show{display:flex}
+
+  /* tab strip */
+  .tabstrip{height:34px;flex:0 0 34px;display:flex;align-items:flex-end;gap:2px;padding:0 8px;
+    background:var(--bg);border-bottom:1px solid var(--border)}
+  .tab{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:7px 7px 0 0;
+    color:var(--muted);font-size:12px}
+  .tab.active{background:var(--elev);color:var(--fg)}
+  .tab .dot{width:7px;height:7px;border-radius:50%}
+  .body{flex:1;display:flex;min-height:0;width:100%}
+  /* rail */
+  .rail{width:46px;flex:0 0 46px;background:var(--bg);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;align-items:center;padding-top:8px;gap:4px}
+  .rail button{width:34px;height:34px;border:0;background:transparent;color:var(--faint);border-radius:8px;
+    display:grid;place-items:center;cursor:pointer;position:relative}
+  .rail button:hover{background:var(--elev-hi);color:var(--muted)}
+  .rail button.active{background:var(--elev-hi);color:var(--accent-fg)}
+  .rail button.active::before{content:"";position:absolute;left:-8px;top:7px;bottom:7px;width:3px;border-radius:2px;background:var(--accent-fg)}
+  .rail svg{width:19px;height:19px}
+  .rail .rbadge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
+    background:var(--red);color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;line-height:1}
+  .rail .spacer{flex:1}
+  /* panel */
+  .panel{width:340px;flex:0 0 340px;background:var(--elev);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;min-height:0}
+  .phead{padding:9px 10px 0;border-bottom:1px solid var(--border)}
+  .ptitle{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+  .ptitle .who{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);min-width:0}
+  .ptitle .who .av{width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#3a5f8a,#a371f7);flex:0 0 auto}
+  .ptitle .who b{color:var(--fg);font-weight:600}
+  .ico-btn{width:24px;height:24px;border:0;background:transparent;color:var(--faint);border-radius:6px;cursor:pointer;display:grid;place-items:center;flex:0 0 auto}
+  .ico-btn:hover{background:var(--elev-hi);color:var(--muted)}
+  .subtabs{display:flex;gap:2px}
+  .subtab{padding:6px 11px;font-size:12px;color:var(--muted);border:0;background:transparent;cursor:pointer;
+    border-bottom:2px solid transparent;position:relative}
+  .subtab:hover{color:var(--fg)}
+  .subtab.active{color:var(--fg);border-bottom-color:var(--accent-fg)}
+  .subtab .cnt{margin-left:5px;background:var(--badge);color:var(--accent-fg);font-size:10px;font-weight:700;
+    padding:1px 5px;border-radius:8px}
+
+  /* scope pill — NEW for v0.3.7 */
+  .scopebar{display:flex;align-items:center;gap:7px;padding:7px 10px;margin:8px 10px 0;border-radius:8px;
+    background:rgba(58,95,138,0.14);border:1px solid rgba(122,167,224,0.3)}
+  .scopebar .dotc{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .scopebar .txt{flex:1;font-size:11.5px;color:var(--accent-fg);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scopebar .txt b{color:var(--fg)}
+  .scopebar button{font-size:10.5px;color:var(--muted);background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:3px 8px;cursor:pointer;flex:0 0 auto}
+  .scopebar button:hover{color:var(--fg);border-color:var(--border-hi)}
+  .scopebar.all{background:rgba(217,162,58,0.1);border-color:rgba(217,162,58,0.32)}
+  .scopebar.all .txt{color:#e0b25e}
+
+  .search{margin:8px 10px 4px;display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);
+    border-radius:7px;padding:5px 8px;color:var(--faint)}
+  .search input{border:0;background:transparent;color:var(--fg);outline:0;width:100%;font-size:12px}
+  .filters{display:flex;gap:6px;padding:2px 10px 6px}
+  .chip{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 9px;cursor:pointer}
+  .chip.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .scroll{flex:1;overflow:auto;padding:4px 6px 12px}
+  .scroll::-webkit-scrollbar{width:9px}.scroll::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:6px}
+  .grp{margin-top:6px}
+  .grp-h{display:flex;align-items:center;gap:6px;padding:4px 6px;color:var(--muted);font-size:11px;
+    text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none}
+  .star{color:var(--yellow)}
+  .row{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 22px;border-radius:7px;cursor:pointer}
+  .row:hover{background:var(--elev-hi)}
+  .row .rk{display:flex;align-items:center;gap:7px;min-width:0}
+  .row .glyph{color:var(--faint);width:13px;text-align:center;flex:0 0 13px}
+  .row .name{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .name .own{color:var(--muted)}
+  .row .meta{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--faint);font-size:11px;flex:0 0 auto}
+  .pill{background:var(--badge);color:var(--accent-fg);font-size:10px;font-weight:700;padding:1px 6px;border-radius:9px}
+  .pin{color:var(--yellow)}
+  .bucket{margin-top:10px}
+  .bucket-h{display:flex;align-items:center;gap:7px;padding:5px 8px;font-size:12px;font-weight:600;color:var(--fg)}
+  .bucket-h .n{margin-left:auto;color:var(--faint);font-weight:500;font-size:11px}
+  .bucket-h.warn{color:#f0a868}
+  .pr{display:flex;flex-direction:column;gap:3px;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+  .pr:hover{background:var(--elev-hi)}
+  .pr.unread{border-color:rgba(122,167,224,0.35);background:rgba(58,95,138,0.10)}
+  .pr-top{display:flex;align-items:center;gap:8px}
+  .pr-top .num{color:var(--muted);font-variant-numeric:tabular-nums}
+  .pr-top .title{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+  .pr-bot{display:flex;align-items:center;gap:8px;color:var(--faint);font-size:11px;flex-wrap:wrap}
+  .pr-bot .repo{color:var(--muted)}
+  .ci-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .ci-pass{background:var(--green)} .ci-fail{background:var(--red)} .ci-run{background:var(--yellow)} .ci-none{background:#555}
+  .tagchip{font-size:10px;padding:1px 7px;border-radius:6px;border:1px solid var(--border-hi);color:var(--muted)}
+  .tagchip.req{color:#f0a868;border-color:rgba(240,168,104,0.4)}
+  .avi{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#555,#888);flex:0 0 16px;font-size:9px;display:grid;place-items:center;color:#ddd}
+  .run{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer}
+  .run:hover{background:var(--elev-hi)}
+  .run .st{flex:0 0 auto;width:16px;display:grid;place-items:center}
+  .run .rmain{min-width:0;flex:1}
+  .run .rmain .l1{display:flex;gap:7px;align-items:center}
+  .run .rmain .wf{color:var(--fg)}
+  .run .rmain .rn{color:var(--faint);font-size:11px}
+  .run .rmain .l2{color:var(--faint);font-size:11px;display:flex;gap:7px;align-items:center;margin-top:2px}
+  .run .branch{color:var(--accent-fg)}
+  .spin{width:13px;height:13px;border:2px solid rgba(217,162,58,0.3);border-top-color:var(--yellow);border-radius:50%;animation:sp 0.8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){.spin{animation:none}}
+  .ok{color:var(--green)}.bad{color:var(--red)}
+  .jobs{margin:2px 0 8px 30px;border-left:1px solid var(--border);padding-left:12px}
+  .job{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--muted);font-size:11px}
+  .runbtns{margin-left:auto;display:flex;gap:4px}
+  .mini{font-size:10px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 7px;cursor:pointer}
+  .mini:hover{border-color:var(--border-hi);color:var(--fg)}
+  .caret{transition:transform .12s;display:inline-block}
+  .caret.open{transform:rotate(90deg)}
+
+  /* ===== settings modal ===== */
+  .modal-shade{position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center}
+  .modal{width:760px;height:520px;background:var(--elev);border:1px solid var(--border-hi);border-radius:14px;
+    display:flex;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.6)}
+  .mnav{width:180px;flex:0 0 180px;background:var(--bg);border-right:1px solid var(--border);padding:14px 8px;display:flex;flex-direction:column;gap:2px}
+  .mbrand{display:flex;align-items:center;gap:7px;padding:2px 8px 14px;color:var(--fg);font-weight:600;font-size:13px}
+  .mnav-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;color:var(--muted);font-size:12.5px;cursor:pointer}
+  .mnav-item.active{background:var(--elev-hi2);color:var(--fg)}
+  .mmain{flex:1;padding:20px 24px;overflow:auto;min-width:0}
+  .mmain h2{margin:0 0 4px;font-size:15px;color:var(--fg)}
+  .mmain .sub{margin:0 0 18px;color:var(--faint);font-size:11.5px}
+  .plist{display:flex;flex-direction:column;gap:8px}
+  .prow{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+  .prow .av2{width:26px;height:26px;border-radius:50%;flex:0 0 auto}
+  .prow .info{flex:1;min-width:0}
+  .prow .info .nm{color:var(--fg);font-size:12.5px;font-weight:600}
+  .prow .info .fo{color:var(--faint);font-size:11px;margin-top:1px}
+  .prow-actions{display:flex;gap:5px}
+  .pexpand{margin:2px 0 4px;padding:14px;border:1px solid var(--border-hi);border-radius:10px;background:var(--bg)}
+  .pexpand h4{margin:0 0 3px;font-size:12px;color:var(--fg)}
+  .pexpand .hint2{margin:0 0 10px;color:var(--faint);font-size:11px}
+  .ghpicker{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .ghp-search{display:flex;align-items:center;gap:6px;padding:6px 9px;border-bottom:1px solid var(--border);color:var(--faint)}
+  .ghp-search input{border:0;background:transparent;color:var(--fg);outline:0;width:100%;font-size:12px}
+  .ghp-list{max-height:170px;overflow:auto}
+  .ghp-row{display:flex;align-items:center;gap:9px;padding:6px 9px;cursor:pointer}
+  .ghp-row:hover{background:var(--elev-hi)}
+  .ck{width:14px;height:14px;border:1.5px solid var(--border-hi);border-radius:4px;flex:0 0 auto;display:grid;place-items:center;font-size:10px;color:transparent}
+  .ck.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .ghp-row .nm2{flex:1;color:var(--fg);font-size:12px}
+  .ghp-row .ow{color:var(--muted)}
+  .ghp-foot{display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-top:1px solid var(--border);color:var(--faint);font-size:11px}
+  .btn-primary{background:var(--accent);border:0;color:#fff;border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer}
+  .btn-ghost{background:transparent;border:1px solid var(--border-hi);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer}
+  .btn-ghost:hover{color:var(--fg)}
+
+  /* ===== PR review view ===== */
+  .prv{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+  .prv-head{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+  .prv-h1{display:flex;align-items:center;gap:10px}
+  .prv-h1 .t{font-size:14.5px;color:var(--fg);font-weight:600;flex:1;min-width:0}
+  .prv-h1 .n{color:var(--faint);font-variant-numeric:tabular-nums}
+  .ext-link{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11.5px;text-decoration:none;cursor:pointer}
+  .ext-link:hover{color:var(--accent-fg)}
+  .prv-badges{display:flex;align-items:center;gap:8px;color:var(--faint);font-size:11.5px}
+  .badge-ci{display:inline-flex;align-items:center;gap:5px}
+  .prv-body{flex:1;overflow:auto;padding:0 0 90px}
+  .diff-file{border-bottom:1px solid var(--border)}
+  .diff-fh{padding:8px 18px;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--muted);
+    background:var(--elev);position:sticky;top:0}
+  .dline{display:flex;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;line-height:1.65}
+  .dline .gut{width:64px;flex:0 0 64px;text-align:right;padding-right:10px;color:var(--faint);user-select:none;position:relative}
+  .dline .cnt{flex:1;white-space:pre;padding-right:14px;color:var(--fg)}
+  .dline.add{background:rgba(46,160,67,0.08)}
+  .dline.add .gut{background:rgba(46,160,67,0.14);color:var(--add-fg)}
+  .dline.add .cnt{color:#c9f0d6}
+  .dline.del{background:rgba(248,81,73,0.08)}
+  .dline.del .gut{background:rgba(248,81,73,0.14);color:var(--del-fg)}
+  .dline.del .cnt{color:#f6c6ca}
+  .dline .addc{position:absolute;left:-2px;top:1px;width:16px;height:16px;border-radius:4px;background:var(--accent);
+    color:#fff;font-size:11px;display:none;place-items:center;cursor:pointer}
+  .dline:hover .addc{display:grid}
+  .thread{margin:2px 18px 10px 64px;border:1px solid var(--border-hi);border-radius:9px;background:var(--elev);overflow:hidden}
+  .thread.resolved{opacity:0.55}
+  .thread-h{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--elev-hi)}
+  .thread-h .rs{margin-left:auto;font-size:10.5px;color:var(--muted);background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:2px 8px;cursor:pointer}
+  .thread-h .rs:hover{color:var(--fg)}
+  .thread-h .resolved-tag{margin-left:auto;font-size:10px;color:var(--green);display:flex;align-items:center;gap:4px}
+  .cmt{display:flex;gap:8px;padding:9px 10px}
+  .cmt + .cmt{border-top:1px solid var(--border)}
+  .cmt .who2{color:var(--fg);font-weight:600;font-size:11.5px}
+  .cmt .when{color:var(--faint);font-size:10.5px;margin-left:6px;font-weight:400}
+  .cmt .body2{color:var(--muted);font-size:12px;margin-top:2px;line-height:1.5}
+  .thread-reply{display:flex;gap:8px;padding:8px 10px;border-top:1px dashed var(--border)}
+  .thread-reply input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--fg);
+    padding:5px 8px;font-size:11.5px;outline:0}
+  .draft-note{margin:2px 18px 10px 64px;padding:8px 10px;border:1px dashed var(--accent-fg);border-radius:9px;
+    background:rgba(58,95,138,0.1);font-size:11.5px;color:var(--accent-fg)}
+
+  .prv-bar{position:absolute;left:0;right:0;bottom:0;padding:12px 18px;background:var(--elev);border-top:1px solid var(--border-hi);
+    display:flex;align-items:center;gap:8px;box-shadow:0 -8px 24px rgba(0,0,0,0.3)}
+  .prv-bar .cnt2{color:var(--faint);font-size:11.5px;margin-right:auto}
+  .prv-bar .cnt2 b{color:var(--accent-fg)}
+  .btn-review{border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;border:1px solid var(--border-hi);background:transparent;color:var(--fg)}
+  .btn-review.approve{border-color:rgba(63,185,80,0.5);color:#7ee0a0}
+  .btn-review.approve:hover{background:rgba(63,185,80,0.12)}
+  .btn-review.request{border-color:rgba(248,81,73,0.5);color:#f6969c}
+  .btn-review:hover{border-color:var(--border-hi);filter:brightness(1.15)}
+  .btn-merge{background:var(--purple);border:0;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer}
+
+  /* ===== merge confirm dialog ===== */
+  .mdlg{width:400px;background:var(--elev);border:1px solid var(--border-hi);border-radius:12px;padding:18px;
+    box-shadow:0 30px 80px rgba(0,0,0,0.6)}
+  .mdlg h3{margin:0 0 4px;font-size:14px;color:var(--fg)}
+  .mdlg .pr-ref{color:var(--muted);font-size:11.5px;margin-bottom:14px}
+  .mdlg .field2{margin-bottom:14px}
+  .mdlg .field2 label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:6px}
+  .methodrow{display:flex;gap:6px}
+  .method{flex:1;text-align:center;padding:8px 6px;border:1px solid var(--border-hi);border-radius:8px;font-size:11.5px;color:var(--muted);cursor:pointer}
+  .method.sel{border-color:var(--purple);color:#fff;background:rgba(163,113,247,0.16)}
+  .mdlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+
+  .callout{margin:14px 0;padding:11px 13px;border-radius:9px;font-size:12px;line-height:1.55}
+  .callout.fix{background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);color:#a8e6bc}
+  .callout.bug{background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);color:#f6b6ba}
+  .legend{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:var(--elev-hi);border:1px solid var(--border-hi);
+    border-radius:20px;padding:6px 14px;font-size:11px;color:var(--muted);box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:5}
+  .legend b{color:var(--accent-fg)}
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="scenebar">
+    <span class="lbl">v0.3.7 mockups</span>
+    <button class="scenebtn on" data-s="s1" onclick="sw(this)">1 · Repo settings</button>
+    <button class="scenebtn" data-s="s2" onclick="sw(this)">2 · Scoped GH tab</button>
+    <button class="scenebtn" data-s="s3" onclick="sw(this)">3 · Pinned Action fix</button>
+    <button class="scenebtn" data-s="s4" onclick="sw(this)">4 · In-app PR review</button>
+  </div>
+
+  <!-- ============ SCENE 1: Settings — GitHub repos per profile ============ -->
+  <div class="scene show" id="s1" style="position:relative;background:#050508">
+    <div class="modal-shade">
+      <div class="modal">
+        <div class="mnav">
+          <div class="mbrand">⬡ Settings</div>
+          <div class="mnav-item">Appearance</div>
+          <div class="mnav-item">Shortcuts</div>
+          <div class="mnav-item active">Claude Profiles</div>
+        </div>
+        <div class="mmain">
+          <h2>Claude Profiles</h2>
+          <p class="sub">Each profile groups project folders under one Claude identity. GitHub repo visibility is now configured per profile.</p>
+          <div class="plist">
+            <div class="prow">
+              <div class="av2" style="background:linear-gradient(135deg,#7fd6b5,#4fae8a)"></div>
+              <div class="info"><div class="nm">Work</div><div class="fo">~/Projects/acme-api · ~/Projects/acme-web</div></div>
+              <div class="prow-actions"><button class="btn-ghost" style="padding:4px 10px">Edit</button></div>
+            </div>
+
+            <div class="pexpand">
+              <h4>GitHub repos visible for “Work”</h4>
+              <p class="hint2">Unchecked ⇒ this profile shows every repo you have access to. Selecting any repo narrows the GitHub tab to just this set whenever a tab bound to this profile is focused.</p>
+              <div class="ghpicker">
+                <div class="ghp-search">⌕<input placeholder="Search your repos…" value="acme"></div>
+                <div class="ghp-list">
+                  <div class="ghp-row"><span class="ck on">✓</span><span class="nm2"><span class="ow">acme/</span>api</span></div>
+                  <div class="ghp-row"><span class="ck on">✓</span><span class="nm2"><span class="ow">acme/</span>web</span></div>
+                  <div class="ghp-row"><span class="ck on">✓</span><span class="nm2"><span class="ow">acme/</span>infra</span></div>
+                  <div class="ghp-row"><span class="ck">✓</span><span class="nm2"><span class="ow">acme/</span>billing-svc</span></div>
+                  <div class="ghp-row"><span class="ck">✓</span><span class="nm2"><span class="ow">acme/</span>mobile</span></div>
+                  <div class="ghp-row"><span class="ck">✓</span><span class="nm2"><span class="ow">acme/</span>design-system</span></div>
+                </div>
+                <div class="ghp-foot"><span>3 of 14 selected</span><span style="cursor:pointer;color:var(--muted)">Clear all</span></div>
+              </div>
+              <div class="mdlg-actions" style="margin-top:12px"><button class="btn-ghost">Cancel</button><button class="btn-primary">Save</button></div>
+            </div>
+
+            <div class="prow">
+              <div class="av2" style="background:linear-gradient(135deg,#8aa8ff,#5a7ce0)"></div>
+              <div class="info"><div class="nm">Personal</div><div class="fo">~/Projects/vector · ~/Projects/scratch</div></div>
+              <div class="prow-actions"><button class="btn-ghost" style="padding:4px 10px">Edit</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 2: GitHub tab auto-scoped to focused tab's profile ============ -->
+  <div class="scene" id="s2">
+    <div class="body">
+      <div class="rail">
+        <button title="Files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+        <button title="Worktrees"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="9" r="2.4"/><path d="M6 8.4v7.2M6 9a6 6 0 0 0 6 6h0a3 3 0 0 0 3-3V11.4"/></svg></button>
+        <button class="active" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.56 2.36 1.11 2.94.85.09-.66.35-1.11.63-1.37-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.7 0 0 .84-.27 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.32 2.75-1.05 2.75-1.05.55 1.4.2 2.44.1 2.7.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.59.69.49A10.02 10.02 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg>
+        </button>
+        <div class="spacer"></div>
+        <button title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L16 2H8l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 3 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L8 22h8l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.1-.4.1-.8.1-1.2z"/></svg></button>
+      </div>
+      <div class="panel">
+        <div class="phead">
+          <div class="ptitle">
+            <span class="who"><span class="av"></span><b>@avram19</b><span style="color:var(--faint)">· gh authed</span></span>
+            <button class="ico-btn" title="Refresh">⟳</button>
+          </div>
+          <div class="subtabs">
+            <button class="subtab active">Repos</button>
+            <button class="subtab">PRs<span class="cnt">4</span></button>
+            <button class="subtab">Actions</button>
+          </div>
+        </div>
+        <div class="scopebar" id="scopepill" onclick="toggleScope()">
+          <span class="dotc" style="background:#7fd6b5"></span>
+          <span class="txt">Scoped to <b>Work</b> — 3 repos</span>
+          <button onclick="event.stopPropagation();toggleScope()">Show all</button>
+        </div>
+        <div class="scroll">
+          <div class="grp">
+            <div class="grp-h"><span class="caret open">▾</span><span class="star">★</span> Favorites</div>
+            <div class="row"><div class="rk"><span class="glyph">🔒</span><span class="name"><span class="own">acme/</span>api</span></div><div class="meta"><span class="pin">★</span><span class="pill">4 PRs</span><span>2h</span></div></div>
+          </div>
+          <div class="grp">
+            <div class="grp-h"><span class="caret open">▾</span> acme <span class="tag" style="margin-left:auto;color:var(--faint);font-size:10px">3 of 14 repos</span></div>
+            <div class="row"><div class="rk"><span class="glyph">🔒</span><span class="name"><span class="own">acme/</span>web</span></div><div class="meta"><span class="pill">2 PRs</span><span>20m</span></div></div>
+            <div class="row"><div class="rk"><span class="glyph">🔒</span><span class="name"><span class="own">acme/</span>infra</span></div><div class="meta"><span>3d</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="term" style="flex:1;background:#000;padding:14px 16px;font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;color:#cdd3df">
+        <div><span style="color:#3fb950">●</span> Claude Code <span style="color:#6b7280">— acme-api (bound to “Work” profile)</span></div>
+        <div style="margin-top:10px;color:#6b7280">Focus another tab bound to a different (or no) profile → the GitHub tab re-scopes or clears automatically.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 3: pinned Action run now expands ============ -->
+  <div class="scene" id="s3">
+    <div class="body" style="width:100%">
+      <div class="panel" style="width:400px;flex:0 0 400px">
+        <div class="phead">
+          <div class="ptitle"><span class="who"><b>Actions</b></span></div>
+          <div class="filters"><span class="chip on"><span class="star">★</span> Favorited</span><span class="chip">acme/api</span></div>
+        </div>
+        <div class="scroll">
+          <div class="grp-h" style="padding-left:8px"><span class="star">★</span> Favorited workflows <span style="margin-left:auto;color:var(--faint);font-size:10px">across repos</span></div>
+
+          <div class="callout bug">
+            <b>Before:</b> clicking a run inside “Favorited workflows” did nothing — the expand/collapse handler was only wired up in the per-repo Actions list, not this cross-repo dashboard section.
+          </div>
+
+          <div class="run" style="opacity:.6;pointer-events:none">
+            <div class="st bad">✖</div>
+            <div class="rmain"><div class="l1"><span class="wf">CI</span><span class="rn">#1283</span></div>
+              <div class="l2"><span class="repo" style="color:var(--muted)">acme/api</span>·<span class="branch">main</span>· push · 18m ago</div></div>
+            <div class="runbtns"><button class="mini">Re-run failed</button></div>
+          </div>
+
+          <div class="callout fix">
+            <b>After:</b> the same click handler used by the per-repo list now drives this row too — clicking anywhere on the row (not the buttons) toggles its job/step breakdown.
+          </div>
+
+          <div class="run" onclick="tg('fixj1')">
+            <div class="st bad">✖</div>
+            <div class="rmain"><div class="l1"><span class="wf">CI</span><span class="rn">#1283</span></div>
+              <div class="l2"><span class="repo" style="color:var(--muted)">acme/api</span>·<span class="branch">main</span>· push · 18m ago</div></div>
+            <div class="runbtns"><button class="mini" onclick="event.stopPropagation()">Re-run failed</button><button class="mini" onclick="event.stopPropagation()">Logs</button></div>
+          </div>
+          <div class="jobs" id="fixj1">
+            <div class="job"><span class="ok">✔</span> lint · 21s</div>
+            <div class="job"><span class="bad">✖</span> test (node 20) · 1m04s — <span class="bad">2 failing</span></div>
+            <div class="job"><span style="color:var(--faint)">○</span> build · skipped</div>
+            <div style="margin-top:5px"><button class="mini">Open --log-failed in preview →</button></div>
+          </div>
+
+          <div class="run" onclick="tg('fixj2')">
+            <div class="st"><div class="spin"></div></div>
+            <div class="rmain"><div class="l1"><span class="wf">Release</span><span class="rn">#57</span></div>
+              <div class="l2"><span class="repo" style="color:var(--muted)">me/vector</span>·<span class="branch">v0.3.7</span>· tag · 40s ago</div></div>
+            <div class="runbtns"><button class="mini" onclick="event.stopPropagation()">Cancel</button></div>
+          </div>
+          <div class="jobs" id="fixj2" style="display:none">
+            <div class="job"><span class="ok">✔</span> build · 30s</div>
+            <div class="job"><div class="spin" style="width:11px;height:11px"></div> sign &amp; notarize · running</div>
+            <div class="job"><span style="color:var(--faint)">○</span> upload release assets · queued</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 4: in-app PR review ============ -->
+  <div class="scene" id="s4" style="position:relative">
+    <div class="prv">
+      <div class="prv-head">
+        <div class="prv-h1">
+          <span class="t">feat(auth): rotate refresh tokens on reuse detection</span>
+          <span class="n">#142</span>
+          <a class="ext-link">↗ Open on GitHub</a>
+        </div>
+        <div class="prv-badges">
+          <span class="badge-ci"><span class="ci-dot ci-fail" style="display:inline-block"></span> CI failing</span>
+          <span>·</span><span>acme/api</span><span>·</span><span>avram19 wants to merge into <b style="color:var(--fg)">main</b> from <b style="color:var(--accent-fg)">feat/auth</b></span>
+        </div>
+      </div>
+      <div class="prv-body">
+        <div class="diff-file">
+          <div class="diff-fh">src/auth/tokens.rs</div>
+          <div class="dline del"><span class="gut">118</span><span class="cnt">-    if reused { return Ok(Rejected); }</span></div>
+          <div class="dline add"><span class="gut">118</span><span class="cnt">+    if reused {</span></div>
+          <div class="dline add"><span class="gut">119</span><span class="cnt">+        revoke_all(&user_id)?;</span><span class="addc">+</span></div>
+          <div class="dline add"><span class="gut">120</span><span class="cnt">+        return Ok(Rejected);</span></div>
+          <div class="dline add"><span class="gut">121</span><span class="cnt">+    }</span></div>
+
+          <div class="thread">
+            <div class="thread-h"><span class="who2" style="font-size:11.5px">1 comment</span><button class="rs" onclick="resolveThread(this)">Resolve</button></div>
+            <div class="cmt"><div class="avi" style="align-self:flex-start">KT</div><div><div class="who2">katet <span class="when">2m ago</span></div><div class="body2">Should this also emit an audit-log event? We log revocations everywhere else in this file.</div></div></div>
+            <div class="thread-reply"><input placeholder="Reply…"></div>
+          </div>
+
+          <div class="dline"><span class="gut">122</span><span class="cnt" style="color:var(--muted)">    Ok(Accepted)</span></div>
+          <div class="dline"><span class="gut">123</span><span class="cnt" style="color:var(--muted)">}</span></div>
+
+          <div class="draft-note">✎ Pending comment on line 119 (not yet posted — will send when you submit your review) <span style="float:right;cursor:pointer">edit · remove</span></div>
+        </div>
+
+        <div class="diff-file">
+          <div class="diff-fh">tests/token_rotation.rs</div>
+          <div class="dline add"><span class="gut">44</span><span class="cnt">+    assert!(revoke_all_called);</span><span class="addc">+</span></div>
+
+          <div class="thread resolved">
+            <div class="thread-h"><span class="who2" style="font-size:11.5px">1 comment</span><span class="resolved-tag">✓ Resolved</span></div>
+            <div class="cmt"><div class="avi" style="align-self:flex-start">SM</div><div><div class="who2">smerchant <span class="when">1h ago</span></div><div class="body2">nit: this mock should assert call count, not just that it fired.</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prv-bar">
+        <span class="cnt2"><b>1</b> pending comment · <b>1</b> open thread</span>
+        <button class="btn-review" onclick="openSummary('comment')">Comment</button>
+        <button class="btn-review request" onclick="openSummary('request')">Request changes</button>
+        <button class="btn-review approve" onclick="openSummary('approve')">Approve</button>
+        <button class="btn-merge" onclick="showMerge()">Merge…</button>
+      </div>
+
+      <div id="mergeOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.55);align-items:center;justify-content:center">
+        <div class="mdlg">
+          <h3>Merge pull request</h3>
+          <div class="pr-ref">#142 into <b style="color:var(--fg)">main</b> · acme/api</div>
+          <div class="field2">
+            <label>Merge method</label>
+            <div class="methodrow">
+              <div class="method sel" onclick="pickMethod(this)">Squash &amp; merge</div>
+              <div class="method" onclick="pickMethod(this)">Merge commit</div>
+              <div class="method" onclick="pickMethod(this)">Rebase</div>
+            </div>
+          </div>
+          <div class="mdlg-actions"><button class="btn-ghost" onclick="hideMerge()">Cancel</button><button class="btn-merge">Squash &amp; merge #142</button></div>
+        </div>
+      </div>
+
+      <div id="summaryOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.55);align-items:center;justify-content:center">
+        <div class="mdlg">
+          <h3 id="sumTitle">Approve</h3>
+          <div class="pr-ref">Submits your pending comment + this summary as one review.</div>
+          <div class="field2">
+            <textarea placeholder="Summary comment (optional)…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--fg);padding:8px;font-size:12px;outline:0;font-family:inherit;resize:vertical"></textarea>
+          </div>
+          <div class="mdlg-actions"><button class="btn-ghost" onclick="hideSummary()">Cancel</button><button class="btn-primary" id="sumBtn">Submit review</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">Vector — v0.3.7 mockups · faux data, click through each scene</div>
+</div>
+
+<script>
+  function sw(btn){
+    document.querySelectorAll('.scenebtn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.scene').forEach(v=>v.classList.remove('show'));
+    document.getElementById(btn.dataset.s).classList.add('show');
+  }
+  function tg(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+  function toggleScope(){
+    var el = document.getElementById('scopepill');
+    if (el.classList.contains('all')) {
+      el.classList.remove('all');
+      el.querySelector('.txt').innerHTML = 'Scoped to <b>Work</b> — 3 repos';
+      el.querySelector('button').textContent = 'Show all';
+    } else {
+      el.classList.add('all');
+      el.querySelector('.txt').innerHTML = 'Showing <b>all</b> repos (session override)';
+      el.querySelector('button').textContent = 'Re-scope';
+    }
+  }
+  function resolveThread(btn){
+    var t = btn.closest('.thread');
+    t.classList.add('resolved');
+    t.querySelector('.thread-h').innerHTML = '<span class="who2" style="font-size:11.5px">1 comment</span><span class="resolved-tag">✓ Resolved</span>';
+  }
+  function showMerge(){ document.getElementById('mergeOverlay').style.display='flex'; }
+  function hideMerge(){ document.getElementById('mergeOverlay').style.display='none'; }
+  function pickMethod(el){
+    el.parentNode.querySelectorAll('.method').forEach(m=>m.classList.remove('sel'));
+    el.classList.add('sel');
+    var label = el.textContent.trim();
+    document.querySelector('#mergeOverlay .btn-merge').textContent = label + ' #142';
+  }
+  function openSummary(kind){
+    var titles = {comment:'Submit review — Comment', request:'Submit review — Request changes', approve:'Submit review — Approve'};
+    document.getElementById('sumTitle').textContent = titles[kind];
+    document.getElementById('summaryOverlay').style.display='flex';
+  }
+  function hideSummary(){ document.getElementById('summaryOverlay').style.display='none'; }
+</script>
+</body>
+</html>
