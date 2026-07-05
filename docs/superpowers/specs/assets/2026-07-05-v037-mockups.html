@@ -284,16 +284,18 @@
               <h4>GitHub repos visible for “Work”</h4>
               <p class="hint2">Unchecked ⇒ this profile shows every repo you have access to. Selecting any repo narrows the GitHub tab to just this set whenever a tab bound to this profile is focused.</p>
               <div class="ghpicker">
-                <div class="ghp-search">⌕<input placeholder="Search your repos…" value="acme"></div>
-                <div class="ghp-list">
-                  <div class="ghp-row"><span class="ck on">✓</span><span class="nm2"><span class="ow">acme/</span>api</span></div>
-                  <div class="ghp-row"><span class="ck on">✓</span><span class="nm2"><span class="ow">acme/</span>web</span></div>
-                  <div class="ghp-row"><span class="ck on">✓</span><span class="nm2"><span class="ow">acme/</span>infra</span></div>
-                  <div class="ghp-row"><span class="ck">✓</span><span class="nm2"><span class="ow">acme/</span>billing-svc</span></div>
-                  <div class="ghp-row"><span class="ck">✓</span><span class="nm2"><span class="ow">acme/</span>mobile</span></div>
-                  <div class="ghp-row"><span class="ck">✓</span><span class="nm2"><span class="ow">acme/</span>design-system</span></div>
+                <div class="ghp-search">⌕<input id="ghpSearch" placeholder="Search your repos…" oninput="filterRepoPicker(this.value)"></div>
+                <div class="ghp-list" id="ghpList">
+                  <div class="ghp-row" data-nm="acme/api"><span class="ck on" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">acme/</span>api</span></div>
+                  <div class="ghp-row" data-nm="acme/web"><span class="ck on" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">acme/</span>web</span></div>
+                  <div class="ghp-row" data-nm="acme/infra"><span class="ck on" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">acme/</span>infra</span></div>
+                  <div class="ghp-row" data-nm="acme/billing-svc"><span class="ck" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">acme/</span>billing-svc</span></div>
+                  <div class="ghp-row" data-nm="acme/mobile"><span class="ck" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">acme/</span>mobile</span></div>
+                  <div class="ghp-row" data-nm="acme/design-system"><span class="ck" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">acme/</span>design-system</span></div>
+                  <div class="ghp-row" data-nm="me/vector"><span class="ck" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">me/</span>vector</span></div>
+                  <div class="ghp-row" data-nm="me/dotfiles"><span class="ck" onclick="toggleCk(this)">✓</span><span class="nm2"><span class="ow">me/</span>dotfiles</span></div>
                 </div>
-                <div class="ghp-foot"><span>3 of 14 selected</span><span style="cursor:pointer;color:var(--muted)">Clear all</span></div>
+                <div class="ghp-foot"><span id="ghpCount">3 of 8 selected</span><span style="cursor:pointer;color:var(--muted)" onclick="clearRepoPicker()">Clear all</span></div>
               </div>
               <div class="mdlg-actions" style="margin-top:12px"><button class="btn-ghost">Cancel</button><button class="btn-primary">Save</button></div>
             </div>
@@ -413,12 +415,22 @@
   </div>
 
   <!-- ============ SCENE 4: in-app PR review ============ -->
-  <div class="scene" id="s4" style="position:relative">
+  <div class="scene" id="s4" style="position:relative;flex-direction:column">
+    <div class="tabstrip">
+      <div class="tab"><span class="dot" style="background:#d77757"></span>acme-api · claude</div>
+      <div class="tab"><span class="dot" style="background:#10a37f"></span>vector · codex</div>
+      <div class="tab active"><span class="dot" style="background:#7aa7e0"></span>#142 · acme/api<span style="margin-left:6px;color:var(--faint);cursor:pointer">✕</span></div>
+      <div class="tab" style="color:var(--faint)">+ </div>
+    </div>
+    <div class="callout fix" style="margin:10px 16px 0">
+      <b>New:</b> opening a PR from the inbox now creates its own tab in the strip above — it no longer splits the current tab's pane. Re-opening the same PR focuses this tab instead of creating a duplicate.
+    </div>
     <div class="prv">
       <div class="prv-head">
         <div class="prv-h1">
           <span class="t">feat(auth): rotate refresh tokens on reuse detection</span>
           <span class="n">#142</span>
+          <a class="ext-link" onclick="alert('Opens a standalone window with just this PR review — no tab strip or sidebar.')">⧉ New window</a>
           <a class="ext-link">↗ Open on GitHub</a>
         </div>
         <div class="prv-badges">
@@ -506,6 +518,22 @@
     document.getElementById(btn.dataset.s).classList.add('show');
   }
   function tg(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'block':'none';}
+  function filterRepoPicker(q){
+    q = q.trim().toLowerCase();
+    document.querySelectorAll('#ghpList .ghp-row').forEach(function(r){
+      r.style.display = !q || r.dataset.nm.toLowerCase().includes(q) ? 'flex' : 'none';
+    });
+  }
+  function updateGhpCount(){
+    var rows = document.querySelectorAll('#ghpList .ghp-row');
+    var on = document.querySelectorAll('#ghpList .ck.on').length;
+    document.getElementById('ghpCount').textContent = on + ' of ' + rows.length + ' selected';
+  }
+  function toggleCk(el){ el.classList.toggle('on'); updateGhpCount(); }
+  function clearRepoPicker(){
+    document.querySelectorAll('#ghpList .ck.on').forEach(function(c){ c.classList.remove('on'); });
+    updateGhpCount();
+  }
   function toggleScope(){
     var el = document.getElementById('scopepill');
     if (el.classList.contains('all')) {
