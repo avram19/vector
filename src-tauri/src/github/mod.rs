@@ -205,3 +205,38 @@ pub async fn get_pr_review_threads(_state: State<'_, AppState>, repo: String, nu
         .await
         .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn start_or_get_pending_review(_state: State<'_, AppState>, repo: String, number: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::start_pending_review(&repo, number))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn add_review_comment(_state: State<'_, AppState>, review_id: String, path: String, line: u32, body: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::add_review_comment(&review_id, &path, line, &body))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn resolve_review_thread(_state: State<'_, AppState>, thread_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::resolve_review_thread(&thread_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn submit_pr_review(_state: State<'_, AppState>, review_id: String, event: String, body: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::submit_pr_review(&review_id, &event, &body))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn merge_pr(_state: State<'_, AppState>, repo: String, number: u64, method: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::merge_pr(&repo, number, &method))
+        .await
+        .map_err(|e| e.to_string())?
+}

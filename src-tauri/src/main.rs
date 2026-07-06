@@ -839,6 +839,11 @@ fn main() {
             github::list_github_notifications,
             github::get_pr_diff,
             github::get_pr_review_threads,
+            github::start_or_get_pending_review,
+            github::add_review_comment,
+            github::resolve_review_thread,
+            github::submit_pr_review,
+            github::merge_pr,
         ])
         .setup(|app| {
             github::notifications::spawn_poller(app.handle().clone());
