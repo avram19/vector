@@ -6,11 +6,29 @@ type ReviewComment = { id: string; author: string; authorAvatar: string | null; 
 type ReviewThread = { id: string; path: string; line: number | null; isResolved: boolean; comments: ReviewComment[] };
 type DraftComment = { path: string; line: number; body: string };
 
-type FileDiff = { path: string; lines: DiffLine[] };
+type FileDiff = { path: string; lines: DiffLine[]; lineNumbers: (number | null)[] };
+
+// Computes GitHub's real new-file line number for each rendered diff row, so
+// review threads/comments (which the backend keys by that real line number,
+// not by array index) can be matched/created correctly.
+function computeLineNumbers(lines: DiffLine[]): (number | null)[] {
+  let newLineNum = 0;
+  return lines.map((line) => {
+    if (line.kind === "hunk") {
+      const m = line.text.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      newLineNum = m ? parseInt(m[1], 10) - 1 : newLineNum;
+      return null;
+    }
+    if (line.kind === "meta") return null;
+    if (line.kind === "del") return null;
+    newLineNum += 1;
+    return newLineNum;
+  });
+}
 
 function splitIntoFiles(raw: string): FileDiff[] {
-  const files: FileDiff[] = [];
-  let current: FileDiff | null = null;
+  const files: { path: string; lines: DiffLine[] }[] = [];
+  let current: { path: string; lines: DiffLine[] } | null = null;
   for (const rawLine of raw.split("\n")) {
     if (rawLine.startsWith("diff --git")) {
       const m = rawLine.match(/^diff --git a\/(.+) b\/(.+)$/);
@@ -19,7 +37,7 @@ function splitIntoFiles(raw: string): FileDiff[] {
     }
     if (current) current.lines.push(...parseDiff(rawLine));
   }
-  return files;
+  return files.map((f) => ({ ...f, lineNumbers: computeLineNumbers(f.lines) }));
 }
 
 export function PrReviewView({ repo, number }: { repo: string; number: number }) {
@@ -146,13 +164,17 @@ export function PrReviewView({ repo, number }: { repo: string; number: number })
               if (line.kind === "hunk" || line.kind === "meta") {
                 return <div key={i} className={`diff-line diff-${line.kind}`}>{line.text}</div>;
               }
-              const lineMatches = threadsByLine.get(`${f.path}:${i}`) ?? [];
+              const lineNum = f.lineNumbers[i];
+              const commentable = lineNum != null;
+              const lineMatches = commentable ? (threadsByLine.get(`${f.path}:${lineNum}`) ?? []) : [];
               return (
                 <div key={i} className="diff-line-wrap">
-                  <div className={`diff-line diff-${line.kind}`} onClick={() => addDraft(f.path, i)}>
+                  <div className={`diff-line diff-${line.kind}`} onClick={() => commentable && addDraft(f.path, lineNum)}>
                     <span className="diff-gutter">{line.kind === "add" ? "+" : line.kind === "del" ? "-" : " "}</span>
                     <span className="diff-content">{line.text}</span>
-                    <span className="diff-addc" onClick={(e) => { e.stopPropagation(); addDraft(f.path, i); }}>+</span>
+                    {commentable && (
+                      <span className="diff-addc" onClick={(e) => { e.stopPropagation(); addDraft(f.path, lineNum); }}>+</span>
+                    )}
                   </div>
                   {lineMatches.map((t) => (
                     <div className={`thread${t.isResolved ? " resolved" : ""}`} key={t.id}>
@@ -172,7 +194,7 @@ export function PrReviewView({ repo, number }: { repo: string; number: number })
                       ))}
                     </div>
                   ))}
-                  {drafts.map((d, di) => d.path === f.path && d.line === i ? (
+                  {drafts.map((d, di) => d.path === f.path && d.line === lineNum ? (
                     <div className="draft-note" key={di}>
                       <textarea value={d.body} onChange={(e) => updateDraft(di, e.target.value)} placeholder="Pending comment…" />
                       <button onClick={() => removeDraft(di)}>Remove</button>
