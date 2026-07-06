@@ -4,6 +4,7 @@ import { ReposView, RepoUpdate } from "./ReposView";
 import { PrInboxView } from "./PrInboxView";
 import { ActionsView } from "./ActionsView";
 import { TriggerModal } from "./TriggerModal";
+import type { ClaudeProfileDto } from "../App";
 
 export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
 
@@ -40,6 +41,7 @@ export function GithubPanel({
   onFavoritedWorkflows,
   onOpenPreview,
   notifications,
+  scopedProfile,
 }: {
   subview: string;
   onSubview: (v: string) => void;
@@ -49,12 +51,19 @@ export function GithubPanel({
   onFavoritedWorkflows: (next: string[]) => void;
   onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
   notifications: { repo: string; number: number; updatedAt: string }[];
+  scopedProfile: ClaudeProfileDto | null;
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [repoFilter, setRepoFilter] = useState<string | null>(null);
   const [actionsRepo, setActionsRepo] = useState<string | null>(null);
   const [triggerTarget, setTriggerTarget] = useState<{ repo: string; presetRef?: string; presetWorkflowId?: number } | null>(null);
+  const [sessionShowAll, setSessionShowAll] = useState(false);
+
+  useEffect(() => { setSessionShowAll(false); }, [scopedProfile?.id]);
+
+  const effectiveRepoFilter: Set<string> | null =
+    sessionShowAll || !scopedProfile?.githubRepos ? null : new Set(scopedProfile.githubRepos);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -101,6 +110,17 @@ export function GithubPanel({
         </span>
         <button className="gh-icobtn" title="Refresh" onClick={refresh}><RefreshIcon /></button>
       </div>
+      {scopedProfile?.githubRepos && (
+        <div className={`gh-scopebar${sessionShowAll ? " all" : ""}`} onClick={() => setSessionShowAll((v) => !v)}>
+          <span className="gh-scopedot" style={{ background: scopedProfile.color }} />
+          <span className="gh-scopetxt">
+            {sessionShowAll ? "Showing all repos (session override)" : (<>Scoped to <b>{scopedProfile.name}</b> — {scopedProfile.githubRepos.length} repos</>)}
+          </span>
+          <button onClick={(e) => { e.stopPropagation(); setSessionShowAll((v) => !v); }}>
+            {sessionShowAll ? "Re-scope" : "Show all"}
+          </button>
+        </div>
+      )}
       <div className="gh-subtabs">
         {SUBTABS.map((t) => (
           <button

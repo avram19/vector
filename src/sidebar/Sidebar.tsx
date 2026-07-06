@@ -5,6 +5,7 @@ import { useSidebarState, SidebarTab, GhNotification } from "./sidebarState";
 import { FileViewer } from "./FileViewer";
 import { WorktreesView } from "./WorktreesView";
 import { GithubPanel } from "../github/GithubPanel";
+import type { ClaudeProfileDto } from "../App";
 
 const RAIL_WIDTH = 42;
 
@@ -63,6 +64,7 @@ function EyeIcon({ closed }: { closed: boolean }) {
 export function Sidebar({
   onOpenSettings,
   projectRoot,
+  scopedProfile,
   sessionId,
   onOpenPreview,
   activePreviewPath,
@@ -72,6 +74,7 @@ export function Sidebar({
 }: {
   onOpenSettings?: () => void;
   projectRoot?: string | null;
+  scopedProfile: ClaudeProfileDto | null;
   sessionId?: string | null;
   onOpenPreview?: (filePath: string, line: number | undefined, col: number | undefined, opts: { pin: boolean; mode?: "file" | "diff"; baseRef?: string }) => void;
   activePreviewPath?: string | null;
@@ -204,6 +207,7 @@ export function Sidebar({
                 onFavoritedWorkflows={(next) => update({ github_favorited_workflows: next })}
                 onOpenPreview={onOpenPreview ?? (() => {})}
                 notifications={notifications}
+                scopedProfile={scopedProfile}
               />
             )}
           </div>

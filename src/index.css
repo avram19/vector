@@ -201,6 +201,14 @@ body.theme-light {
 .gh-subbody { flex: 1; overflow: auto; min-height: 0; }
 .gh-placeholder { padding: 16px; color: var(--gh-faint); font-size: 12px; }
 
+.gh-scopebar { display: flex; align-items: center; gap: 7px; padding: 7px 10px; margin: 0 10px 6px; border-radius: 8px; background: rgba(58,95,138,0.14); border: 1px solid rgba(122,167,224,0.3); cursor: pointer; }
+.gh-scopedot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.gh-scopetxt { flex: 1; font-size: 11.5px; color: var(--gh-accent); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gh-scopetxt b { color: var(--gh-fg); }
+.gh-scopebar button { font-size: 10.5px; color: var(--gh-muted); background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 3px 8px; cursor: pointer; flex: 0 0 auto; }
+.gh-scopebar.all { background: rgba(217,162,58,0.1); border-color: rgba(217,162,58,0.32); }
+.gh-scopebar.all .gh-scopetxt { color: var(--gh-star); }
+
 /* ── GitHub repos tree ────────────────────────────────────── */
 .gh-repos { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .gh-search { display: flex; align-items: center; gap: 6px; margin: 4px 0 4px; padding: 4px 12px 8px; background: transparent; border: 0; border-bottom: 1px solid var(--gh-border); color: var(--gh-faint); }

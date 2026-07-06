@@ -388,7 +388,7 @@ type Orientation = "horizontal" | "vertical";
 type PickerState = { open: boolean; forTabId?: string };
 type SettingsSection = "appearance" | "shortcuts" | "profiles";
 
-type ClaudeProfileDto = {
+export type ClaudeProfileDto = {
   id: string;
   name: string;
   color: string;
@@ -1640,6 +1640,7 @@ export default function App() {
       <Sidebar
         onOpenSettings={() => { setSettingsSection("appearance"); setSettingsOpen(true); }}
         projectRoot={activeLeaf?.cwd ?? null}
+        scopedProfile={resolveProfileForCwd(claudeProfiles, activeLeaf?.cwd ?? "")}
         sessionId={
           activeLeaf
             ? (isPtyLeaf(activeLeaf) ? activeLeaf.id : (activeLeaf.sessionId ?? null))
