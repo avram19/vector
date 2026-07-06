@@ -396,6 +396,7 @@ type ClaudeProfileDto = {
   createdMs: number;
   configDir: string;
   signedInEmail: string | null;
+  githubRepos: string[] | null;
 };
 
 const PROFILE_COLORS = ["#7fd6b5", "#8aa8ff", "#f08a9a", "#f5b14a", "#a88af0", "#7ad3e3"];
@@ -2685,6 +2686,12 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
           </details>
         )}
         {error && <div style={{ color: "#ff5a5a", fontSize: 12 }}>{error}</div>}
+        {mode === "edit" && initial && (
+          <GithubReposPicker
+            profile={initial}
+            onSaved={() => { /* re-fetch happens via onSaved(await onChanged()) at the ProfilesSection level */ onSaved(); }}
+          />
+        )}
         <div className="profile-dialog-foot">
           <button onClick={onClose} disabled={busy}>Cancel</button>
           <button className="btn-primary" onClick={save} disabled={busy || !name.trim()}>
@@ -2692,6 +2699,76 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GithubReposPicker({ profile, onSaved }: { profile: ClaudeProfileDto; onSaved: (next: ClaudeProfileDto) => void }) {
+  const [allRepos, setAllRepos] = useState<{ nameWithOwner: string }[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set(profile.githubRepos ?? []));
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke<{ nameWithOwner: string }[]>("get_cached_github_repos").then(setAllRepos).catch(() => {});
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? allRepos.filter((r) => r.nameWithOwner.toLowerCase().includes(q)) : allRepos;
+  }, [allRepos, query]);
+
+  const toggle = (name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const githubRepos = selected.size > 0 ? [...selected] : null;
+      const dto = await invoke<ClaudeProfileDto>("update_claude_profile", { id: profile.id, githubRepos });
+      onSaved(dto);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="profile-github-repos">
+      <label className="field-label">GitHub repos visible for &ldquo;{profile.name}&rdquo;</label>
+      <p className="field-hint">Unchecked ⇒ this profile shows every repo you have access to.</p>
+      <input
+        className="profile-github-search"
+        placeholder="Search your repos…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+      />
+      <div className="profile-github-list">
+        {filtered.map((r) => (
+          <label key={r.nameWithOwner} className="profile-github-row">
+            <input type="checkbox" checked={selected.has(r.nameWithOwner)} onChange={() => toggle(r.nameWithOwner)} />
+            <span>{r.nameWithOwner}</span>
+          </label>
+        ))}
+        {filtered.length === 0 && <div className="field-hint">No repos match.</div>}
+      </div>
+      <div className="profile-github-foot">
+        <span className="field-hint">{selected.size} of {allRepos.length} selected</span>
+        <button type="button" className="link-btn" onClick={() => setSelected(new Set())}>Clear all</button>
+      </div>
+      {error && <div style={{ color: "#ff5a5a", fontSize: 12 }}>{error}</div>}
+      <button type="button" className="btn-primary" disabled={saving} onClick={save}>
+        {saving ? "Saving…" : "Save repo visibility"}
+      </button>
     </div>
   );
 }
