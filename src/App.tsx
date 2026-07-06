@@ -138,13 +138,23 @@ type PreviewLeaf = {
   baseRef?: string;        // only meaningful when mode === "diff"; e.g., "origin/main"
 };
 
-type PaneLeaf = PtyLeaf | PreviewLeaf;
+type PrReviewLeaf = {
+  kind: "prReview";
+  id: string;
+  repo: string;
+  number: number;
+};
+
+type PaneLeaf = PtyLeaf | PreviewLeaf | PrReviewLeaf;
 
 function isPtyLeaf(leaf: PaneLeaf): leaf is PtyLeaf {
   return leaf.kind === "pty";
 }
 function isPreviewLeaf(leaf: PaneLeaf): leaf is PreviewLeaf {
   return leaf.kind === "preview";
+}
+function isPrReviewLeaf(leaf: PaneLeaf): leaf is PrReviewLeaf {
+  return leaf.kind === "prReview";
 }
 type PaneSplit = {
   kind: "split";
@@ -181,7 +191,7 @@ function splitLeaf(root: PaneNode, leafId: string, direction: "row" | "column", 
     if (node.kind !== "split") {
       if (node.id !== leafId) return node;
       newLeafId = crypto.randomUUID();
-      const newLeaf: PaneLeaf = { kind: "pty", id: newLeafId, agentId: newAgentId, cwd: node.cwd, epoch: 0 };
+      const newLeaf: PaneLeaf = { kind: "pty", id: newLeafId, agentId: newAgentId, cwd: node.kind === "prReview" ? "" : node.cwd, epoch: 0 };
       return { kind: "split", id: crypto.randomUUID(), direction, children: [node, newLeaf], ratio: 0.5 };
     }
     return { ...node, children: [walk(node.children[0]), walk(node.children[1])] };
@@ -243,7 +253,7 @@ function splitLeafWithLeaf(
   return { root: walk(root), newLeafId };
 }
 function findPreviewSlot(node: PaneNode): PreviewLeaf | null {
-  if (node.kind === "pty") return null;
+  if (node.kind === "pty" || node.kind === "prReview") return null;
   if (node.kind === "preview") return node.isPreviewSlot ? node : null;
   return findPreviewSlot(node.children[0]) ?? findPreviewSlot(node.children[1]);
 }
@@ -253,7 +263,7 @@ function findPreviewByFile(
   mode: "file" | "diff",
   baseRef: string | undefined,
 ): PreviewLeaf | null {
-  if (node.kind === "pty") return null;
+  if (node.kind === "pty" || node.kind === "prReview") return null;
   if (node.kind === "preview") {
     const leafMode = node.mode ?? "file";
     if (node.filePath === filePath && leafMode === mode && (node.baseRef ?? undefined) === baseRef) {
@@ -265,8 +275,9 @@ function findPreviewByFile(
     ?? findPreviewByFile(node.children[1], filePath, mode, baseRef);
 }
 function getCwdForLeaf(node: PaneNode, leafId: string): string | null {
-  if (node.kind !== "split") return node.id === leafId ? node.cwd : null;
-  return getCwdForLeaf(node.children[0], leafId) ?? getCwdForLeaf(node.children[1], leafId);
+  if (node.kind === "split") return getCwdForLeaf(node.children[0], leafId) ?? getCwdForLeaf(node.children[1], leafId);
+  if (node.kind === "prReview") return null;
+  return node.id === leafId ? node.cwd : null;
 }
 
 // --- companion shell helpers ---
@@ -345,6 +356,7 @@ function migrateNodeDroppingPreviews(node: any): PaneNode | null {
   }
   if (node.kind === "pty") return node as PtyLeaf;
   if (node.kind === "preview") return null;
+  if (node.kind === "prReview") return null;
   if (node.kind === "split") {
     const a = migrateNodeDroppingPreviews(node.children?.[0]);
     const b = migrateNodeDroppingPreviews(node.children?.[1]);
@@ -1037,9 +1049,9 @@ export default function App() {
           // falling back to the leaf's own embedded values when the focus is already a preview.
           const focused = findLeaf(tab.root, tab.activePaneId);
           const sourceSessionId = focused
-            ? (isPtyLeaf(focused) ? focused.id : focused.sessionId)
+            ? (isPtyLeaf(focused) ? focused.id : (isPreviewLeaf(focused) ? focused.sessionId : undefined))
             : undefined;
-          const sourceCwd = focused?.cwd ?? "/";
+          const sourceCwd = (focused && focused.kind !== "prReview" ? focused.cwd : undefined) ?? "/";
 
           if (opts.pin) {
             // Duplicate guard: if any preview leaf already shows this exact file+mode+baseRef,
@@ -1086,6 +1098,28 @@ export default function App() {
     };
     (window as any).__openPreview = openPreview;
   }, [openPreview]);
+
+  const openPrReviewTab = useCallback((repo: string, number: number) => {
+    setTabs((prev) => {
+      const existingIdx = prev.findIndex((t) => {
+        const leaf = t.root.kind !== "split" ? t.root : null;
+        return leaf && isPrReviewLeaf(leaf) && leaf.repo === repo && leaf.number === number;
+      });
+      if (existingIdx !== -1) {
+        setActiveId(prev[existingIdx].id);
+        return prev;
+      }
+      const leaf: PrReviewLeaf = { kind: "prReview", id: crypto.randomUUID(), repo, number };
+      const newTab: Tab = { id: crypto.randomUUID(), root: leaf, activePaneId: leaf.id };
+      setActiveId(newTab.id);
+      return [...prev, newTab];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as any).__openPrReviewTab = openPrReviewTab;
+  }, [openPrReviewTab]);
 
   const setActivePane = useCallback((tabId: string, paneId: string) => {
     setTabs((prev) => prev.map((t) => t.id === tabId ? { ...t, activePaneId: paneId } : t));
@@ -1453,8 +1487,9 @@ export default function App() {
         {tabs.map((t, i) => {
           const activeLeaf = findLeaf(t.root, t.activePaneId);
           const activePtyLeaf = activeLeaf && isPtyLeaf(activeLeaf) ? activeLeaf : null;
+          const prReviewLeaf = t.root.kind !== "split" && isPrReviewLeaf(t.root) ? t.root : null;
           const tabAgentId = activePtyLeaf?.agentId ?? "__shell__";
-          const tabCwd = activeLeaf?.cwd ?? "";
+          const tabCwd = (activeLeaf && activeLeaf.kind !== "prReview" ? activeLeaf.cwd : undefined) ?? "";
           const agent = agents.find((a) => a.id === tabAgentId);
           const agentLabel = agent?.label ?? (tabAgentId === "__shell__" ? "shell" : tabAgentId);
           const rawTitle = paneTitles[t.activePaneId] || "";
@@ -1462,7 +1497,9 @@ export default function App() {
             .replace(new RegExp(`^\\s*${agentLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[–—\\-:·|·]?\\s*`, "i"), "")
             .trim();
           // tab-level rename wins; else active pane's user name; else stripped PTY title; else basename(cwd)
-          const title = t.userTitle || activePtyLeaf?.userTitle || stripped || basename(tabCwd);
+          const title = prReviewLeaf
+            ? `#${prReviewLeaf.number} · ${prReviewLeaf.repo}`
+            : (t.userTitle || activePtyLeaf?.userTitle || stripped || basename(tabCwd));
           const isRenaming = renamingTabId === t.id;
           const classes = ["tab"];
           if (t.id === activeId) classes.push("active");
@@ -1491,7 +1528,9 @@ export default function App() {
                 setTabDropIndex(null);
               }}
             >
-              <span className="agent-chip"><AgentIcon id={tabAgentId} size={14} /></span>
+              {prReviewLeaf
+                ? <span className="tab-dot tab-dot-pr" title="PR review" />
+                : <span className="agent-chip"><AgentIcon id={tabAgentId} size={14} /></span>}
               {isRenaming ? (
                 <input
                   className="tab-rename"
@@ -1639,15 +1678,15 @@ export default function App() {
     <>
       <Sidebar
         onOpenSettings={() => { setSettingsSection("appearance"); setSettingsOpen(true); }}
-        projectRoot={activeLeaf?.cwd ?? null}
-        scopedProfile={resolveProfileForCwd(claudeProfiles, activeLeaf?.cwd ?? "")}
+        projectRoot={activeLeaf && activeLeaf.kind !== "prReview" ? activeLeaf.cwd : null}
+        scopedProfile={resolveProfileForCwd(claudeProfiles, activeLeaf && activeLeaf.kind !== "prReview" ? activeLeaf.cwd : "")}
         sessionId={
           activeLeaf
-            ? (isPtyLeaf(activeLeaf) ? activeLeaf.id : (activeLeaf.sessionId ?? null))
+            ? (isPtyLeaf(activeLeaf) ? activeLeaf.id : (isPreviewLeaf(activeLeaf) ? (activeLeaf.sessionId ?? null) : null))
             : null
         }
         onOpenPreview={openPreview}
-        activePreviewPath={activeLeaf && !isPtyLeaf(activeLeaf) ? activeLeaf.filePath : null}
+        activePreviewPath={activeLeaf && isPreviewLeaf(activeLeaf) ? activeLeaf.filePath : null}
         pinnedPaths={pinnedForCurrent}
         pinEnabled={pinKey != null}
         onTogglePin={togglePin}
@@ -1756,7 +1795,7 @@ export default function App() {
         </div>
       )}
       <div className="topbar" style={{ marginLeft: "var(--sidebar-offset, 0px)" }}>
-        {activeTab && activeLeaf ? (
+        {activeTab && activeLeaf && activeLeaf.kind !== "prReview" ? (
           <button className="project-btn" onClick={() => openPickerForTab(activeTab.id)} title={activeLeaf.cwd}>
             <VectorMark size={14} /> {basename(activeLeaf.cwd)}
           </button>
@@ -3496,6 +3535,26 @@ function PaneView(props: PaneViewProps) {
                   mode={leaf.mode}
                   baseRef={leaf.baseRef}
                 />
+              </div>
+            </div>
+          );
+        }
+        if (leaf.kind === "prReview") {
+          // Placeholder pane body — the real PrReviewView lands in a later task.
+          return (
+            <div
+              key={leaf.id}
+              className={`pane${isActive ? " pane-active" : ""}${single ? " pane-solo" : ""}`}
+              style={{
+                position: "absolute",
+                left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`,
+                borderRadius: `${tl} ${tr} ${br} ${bl}`,
+                overflow: "hidden",
+              }}
+              onMouseDown={() => onFocusPane(leaf.id)}
+            >
+              <div className="pane-body" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted, #888)" }}>
+                PR #{leaf.number} · {leaf.repo}
               </div>
             </div>
           );

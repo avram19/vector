@@ -350,4 +350,7 @@ body.theme-light {
 .gh-pr-deploy:hover { background: var(--gh-row-hover); }
 .sidebar-rail-icon { position: relative; }
 .sidebar-rail-badge { position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: #d9483b; color: #fff; font-size: 9px; font-weight: 700; line-height: 15px; text-align: center; }
+
+/* ── Tab strip ────────────────────────────────────────────── */
+.tab-dot-pr{width:7px;height:7px;border-radius:50%;background:#7aa7e0;flex:0 0 auto;margin-right:2px}
 .gh-pr-unread { width: 7px; height: 7px; border-radius: 50%; background: var(--gh-accent); flex: 0 0 auto; }
