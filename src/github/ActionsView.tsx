@@ -33,13 +33,14 @@ function StatusGlyph({ status, conclusion }: { status: string; conclusion: strin
 
 function favKey(repo: string, path: string) { return `${repo}:${path.split("/").pop()}`; }
 
-export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRepo, onTrigger }: {
+export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRepo, onTrigger, scopeFilter }: {
   favorites: string[];
   onFavorites: (next: string[]) => void;
   onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
   repo: string | null;
   onRepo: (r: string | null) => void;
   onTrigger: (target: { repo: string; presetWorkflowId?: number }) => void;
+  scopeFilter: Set<string> | null;
 }) {
   const [favRuns, setFavRuns] = useState<Run[] | null>(null);
   const [allRepos, setAllRepos] = useState<string[]>([]);
@@ -52,9 +53,10 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
   const [error, setError] = useState<string | null>(null);
 
   const loadFavRuns = useCallback(() => {
-    if (favorites.length === 0) { setFavRuns([]); return; }
-    invoke<Run[]>("list_github_favorite_runs", { favorites }).then(setFavRuns).catch((e) => setError(String(e)));
-  }, [favorites]);
+    const inScope = scopeFilter ? favorites.filter((f) => scopeFilter.has(f.split(":")[0])) : favorites;
+    if (inScope.length === 0) { setFavRuns([]); return; }
+    invoke<Run[]>("list_github_favorite_runs", { favorites: inScope }).then(setFavRuns).catch((e) => setError(String(e)));
+  }, [favorites, scopeFilter]);
 
   useEffect(() => { loadFavRuns(); }, [loadFavRuns]);
 
@@ -150,7 +152,10 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
     onFavorites(favorites.includes(k) ? favorites.filter((x) => x !== k) : [...favorites, k]);
   };
 
-  const repoOptions = useMemo(() => [...allRepos].sort(), [allRepos]);
+  const repoOptions = useMemo(() => {
+    const all = [...allRepos].sort();
+    return scopeFilter ? all.filter((r) => scopeFilter.has(r)) : all;
+  }, [allRepos, scopeFilter]);
 
   return (
     <div className="gh-actions">

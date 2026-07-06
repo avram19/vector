@@ -104,12 +104,13 @@ function RefreshIcon() {
   );
 }
 
-export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifications }: {
+export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifications, scopeFilter }: {
   repoFilter: string | null;
   onRepoFilter: (r: string | null) => void;
   login: string;
   onTrigger: (target: { repo: string; presetRef?: string }) => void;
   notifications: { repo: string; number: number; updatedAt: string }[];
+  scopeFilter: Set<string> | null;
 }) {
   const [mine, setMine] = useState<MyPrs | null>(null);
   const [team, setTeam] = useState<PullRequest[] | null>(null);
@@ -192,8 +193,9 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
     (mine?.recentlyClosed ?? []).forEach((p) => set.add(p.repo));
     (team ?? []).forEach((p) => set.add(p.repo));
     if (repoFilter) set.add(repoFilter);
-    return [...set].sort();
-  }, [allRepos, mine, team, repoFilter]);
+    const all = [...set].sort();
+    return scopeFilter ? all.filter((r) => scopeFilter.has(r)) : all;
+  }, [allRepos, mine, team, repoFilter, scopeFilter]);
 
   const unreadSet = useMemo(() => new Set(notifications.map((n) => `${n.repo}#${n.number}`)), [notifications]);
 
@@ -207,9 +209,10 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
 
   const groups = useMemo(() => {
     const weekAgo = Date.now() - 7 * 86400_000;
+    const inScope = (p: PullRequest) => !scopeFilter || scopeFilter.has(p.repo);
     if (repoFilter) {
       // Repo mode: all open PRs in the repo, split by authorship.
-      const prs = (repoPrs ?? []).filter(match);
+      const prs = (repoPrs ?? []).filter(inScope).filter(match);
       const authored = prs.filter((p) => p.author === login);
       const teamPrs = prs.filter((p) => p.author !== login);
       return {
@@ -220,16 +223,16 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
         teamPrs,
       };
     }
-    const authored = (mine?.authored ?? []).filter(match);
-    const done = (mine?.recentlyClosed ?? []).filter((p) => match(p) && new Date(p.updatedAt).getTime() >= weekAgo);
+    const authored = (mine?.authored ?? []).filter(inScope).filter(match);
+    const done = (mine?.recentlyClosed ?? []).filter(inScope).filter((p) => match(p) && new Date(p.updatedAt).getTime() >= weekAgo);
     return {
       action: authored.filter(needsAction),
       ready: authored.filter((p) => !needsAction(p) && readyToMerge(p)),
       waiting: authored.filter((p) => !needsAction(p) && !readyToMerge(p)),
       done,
-      teamPrs: (team ?? []).filter(match),
+      teamPrs: (team ?? []).filter(inScope).filter(match),
     };
-  }, [repoFilter, repoPrs, mine, team, match, login]);
+  }, [repoFilter, repoPrs, mine, team, match, login, scopeFilter]);
 
   const myTotal = groups.action.length + groups.ready.length + groups.waiting.length + groups.done.length;
   const nothingLoaded = !mine && !team && !repoPrs;

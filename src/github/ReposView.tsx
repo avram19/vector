@@ -61,6 +61,7 @@ export function ReposView({
   onUpdate,
   onOpenPrs,
   onOpenActions,
+  repoFilter,
 }: {
   pinned: string[];
   customGroups: string[];
@@ -69,6 +70,7 @@ export function ReposView({
   onUpdate: (patch: RepoUpdate) => void;
   onOpenPrs: (repo: string) => void;
   onOpenActions: (repo: string) => void;
+  repoFilter: Set<string> | null;
 }) {
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export function ReposView({
     const searching = q.length > 0;
     // Archived repos are hidden by default and only surface when actively searching.
     const visible = repos.filter((r) => {
+      if (repoFilter && !repoFilter.has(r.nameWithOwner)) return false;
       if (r.isArchived && !searching) return false;
       return !q || r.nameWithOwner.toLowerCase().includes(q);
     });
@@ -149,7 +152,7 @@ export function ReposView({
       out.push({ key: `org:${owner}`, label: owner, tag: `org · ${list.length} repos`, repos: list });
     }
     return out;
-  }, [repos, filter, pinnedSet, customGroups, repoGroup]);
+  }, [repos, filter, pinnedSet, customGroups, repoGroup, repoFilter]);
 
   const toggleCollapse = (key: string) => {
     const next = collapsedSet.has(key)

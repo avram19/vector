@@ -142,9 +142,10 @@ export function GithubPanel({
             onUpdate={onRepoUpdate}
             onOpenPrs={(repo) => { setRepoFilter(repo); onSubview("prs"); }}
             onOpenActions={(repo) => { setActionsRepo(repo); onSubview("actions"); }}
+            repoFilter={effectiveRepoFilter}
           />
         )}
-        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} notifications={notifications} />}
+        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} notifications={notifications} scopeFilter={effectiveRepoFilter} />}
         {active === "actions" && (
           <ActionsView
             favorites={favoritedWorkflows}
@@ -153,6 +154,7 @@ export function GithubPanel({
             repo={actionsRepo}
             onRepo={setActionsRepo}
             onTrigger={(t) => setTriggerTarget(t)}
+            scopeFilter={effectiveRepoFilter}
           />
         )}
       </div>
