@@ -348,6 +348,8 @@ body.theme-light {
 .gh-run-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 .gh-pr-deploy { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-accent); border-radius: 6px; padding: 0 7px; font-size: 10px; cursor: pointer; flex: 0 0 auto; }
 .gh-pr-deploy:hover { background: var(--gh-row-hover); }
+.gh-pr-extlink { background: transparent; border: 0; color: var(--gh-faint); cursor: pointer; font-size: 11px; padding: 1px 3px; }
+.gh-pr-extlink:hover { color: var(--gh-muted); }
 .sidebar-rail-icon { position: relative; }
 .sidebar-rail-badge { position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: #d9483b; color: #fff; font-size: 9px; font-weight: 700; line-height: 15px; text-align: center; }
 

@@ -42,6 +42,7 @@ export function GithubPanel({
   onOpenPreview,
   notifications,
   scopedProfile,
+  onOpenPrReview,
 }: {
   subview: string;
   onSubview: (v: string) => void;
@@ -52,6 +53,7 @@ export function GithubPanel({
   onOpenPreview: (path: string, line: number | undefined, col: number | undefined, opts: { pin: boolean }) => void;
   notifications: { repo: string; number: number; updatedAt: string }[];
   scopedProfile: ClaudeProfileDto | null;
+  onOpenPrReview: (repo: string, number: number) => void;
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,7 +147,7 @@ export function GithubPanel({
             repoFilter={effectiveRepoFilter}
           />
         )}
-        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} notifications={notifications} scopeFilter={effectiveRepoFilter} />}
+        {active === "prs" && <PrInboxView repoFilter={repoFilter} onRepoFilter={setRepoFilter} login={auth.login ?? ""} onTrigger={(t) => setTriggerTarget(t)} notifications={notifications} scopeFilter={effectiveRepoFilter} onOpenPrReview={onOpenPrReview} />}
         {active === "actions" && (
           <ActionsView
             favorites={favoritedWorkflows}

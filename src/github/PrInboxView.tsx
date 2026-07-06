@@ -45,7 +45,12 @@ function Avatar({ pr }: { pr: PullRequest }) {
   return <span className="gh-pr-avatar gh-pr-avatar--fallback">{initials(pr.author)}</span>;
 }
 
-function PrRow({ pr, onTrigger, unreadSet }: { pr: PullRequest; onTrigger: (t: { repo: string; presetRef?: string }) => void; unreadSet: Set<string> }) {
+function PrRow({ pr, onTrigger, unreadSet, onOpenPrReview }: {
+  pr: PullRequest;
+  onTrigger: (t: { repo: string; presetRef?: string }) => void;
+  unreadSet: Set<string>;
+  onOpenPrReview: (repo: string, number: number) => void;
+}) {
   const unread = unreadSet.has(`${pr.repo}#${pr.number}`);
   const chips: { label: string; cls: string }[] = [];
   if (pr.state === "MERGED") chips.push({ label: "Merged", cls: "merged" });
@@ -58,7 +63,7 @@ function PrRow({ pr, onTrigger, unreadSet }: { pr: PullRequest; onTrigger: (t: {
     if (pr.isDraft) chips.push({ label: "draft", cls: "draft" });
   }
   return (
-    <div className="gh-pr-row" onClick={() => invoke("open_path", { path: pr.url })} title={pr.title}>
+    <div className="gh-pr-row" onClick={() => onOpenPrReview(pr.repo, pr.number)} title={pr.title}>
       <div className="gh-pr-top">
         {unread && <span className="gh-pr-unread" title="Unread activity" />}
         <span className={`gh-ci-dot ${ciClass(pr.ciStatus)}`} />
@@ -73,6 +78,11 @@ function PrRow({ pr, onTrigger, unreadSet }: { pr: PullRequest; onTrigger: (t: {
           <button className="gh-pr-deploy" title={`Run a workflow on ${pr.headRef}`}
             onClick={(e) => { e.stopPropagation(); onTrigger({ repo: pr.repo, presetRef: pr.headRef }); }}>Deploy</button>
         )}
+        <button
+          className="gh-pr-extlink"
+          title="Open on GitHub"
+          onClick={(e) => { e.stopPropagation(); invoke("open_path", { path: pr.url }); }}
+        >↗</button>
         <Avatar pr={pr} />
         <span className="gh-pr-time">{relTime(pr.updatedAt)}</span>
       </div>
@@ -104,13 +114,14 @@ function RefreshIcon() {
   );
 }
 
-export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifications, scopeFilter }: {
+export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifications, scopeFilter, onOpenPrReview }: {
   repoFilter: string | null;
   onRepoFilter: (r: string | null) => void;
   login: string;
   onTrigger: (target: { repo: string; presetRef?: string }) => void;
   notifications: { repo: string; number: number; updatedAt: string }[];
   scopeFilter: Set<string> | null;
+  onOpenPrReview: (repo: string, number: number) => void;
 }) {
   const [mine, setMine] = useState<MyPrs | null>(null);
   const [team, setTeam] = useState<PullRequest[] | null>(null);
@@ -282,14 +293,14 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
         ) : (
           <>
             <Section title="My Pull Requests" count={myTotal} level={0}>
-              {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} />)}</Section>}
-              {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} />)}</Section>}
-              {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} />)}</Section>}
-              {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} />)}</Section>}
+              {groups.action.length > 0 && <Section title="Needs Action" count={groups.action.length} level={1}>{groups.action.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />)}</Section>}
+              {groups.ready.length > 0 && <Section title="Ready to Merge" count={groups.ready.length} level={1}>{groups.ready.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />)}</Section>}
+              {groups.waiting.length > 0 && <Section title="Waiting for Review/Checks" count={groups.waiting.length} level={1}>{groups.waiting.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />)}</Section>}
+              {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />)}</Section>}
               {myTotal === 0 && <div className="gh-placeholder">Nothing here. 🎉</div>}
             </Section>
             <Section title="Team Pull Requests" count={groups.teamPrs.length} level={0}>
-              {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} />) : <div className="gh-placeholder">No pull requests.</div>}
+              {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />) : <div className="gh-placeholder">No pull requests.</div>}
               {!repoFilter && teamCursor && <ViewMore loading={teamMore} onClick={loadMoreTeam} />}
             </Section>
             {repoFilter && repoCursor && <ViewMore loading={repoMore} onClick={loadMoreRepo} />}

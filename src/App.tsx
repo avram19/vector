@@ -1681,6 +1681,7 @@ export default function App() {
         onOpenSettings={() => { setSettingsSection("appearance"); setSettingsOpen(true); }}
         projectRoot={activeLeaf && activeLeaf.kind !== "prReview" ? activeLeaf.cwd : null}
         scopedProfile={resolveProfileForCwd(claudeProfiles, activeLeaf && activeLeaf.kind !== "prReview" ? activeLeaf.cwd : "")}
+        onOpenPrReview={openPrReviewTab}
         sessionId={
           activeLeaf
             ? (isPtyLeaf(activeLeaf) ? activeLeaf.id : (isPreviewLeaf(activeLeaf) ? (activeLeaf.sessionId ?? null) : null))

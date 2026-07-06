@@ -65,6 +65,7 @@ export function Sidebar({
   onOpenSettings,
   projectRoot,
   scopedProfile,
+  onOpenPrReview,
   sessionId,
   onOpenPreview,
   activePreviewPath,
@@ -75,6 +76,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
   projectRoot?: string | null;
   scopedProfile: ClaudeProfileDto | null;
+  onOpenPrReview: (repo: string, number: number) => void;
   sessionId?: string | null;
   onOpenPreview?: (filePath: string, line: number | undefined, col: number | undefined, opts: { pin: boolean; mode?: "file" | "diff"; baseRef?: string }) => void;
   activePreviewPath?: string | null;
@@ -208,6 +210,7 @@ export function Sidebar({
                 onOpenPreview={onOpenPreview ?? (() => {})}
                 notifications={notifications}
                 scopedProfile={scopedProfile}
+                onOpenPrReview={onOpenPrReview}
               />
             )}
           </div>
