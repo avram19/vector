@@ -837,6 +837,8 @@ fn main() {
             github::github_rerun,
             github::github_cancel,
             github::list_github_notifications,
+            github::get_pr_diff,
+            github::get_pr_review_threads,
         ])
         .setup(|app| {
             github::notifications::spawn_poller(app.handle().clone());

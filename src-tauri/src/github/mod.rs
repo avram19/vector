@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod client;
 pub mod notifications;
+pub mod pr_review;
 pub mod prs;
 pub mod repos;
 
@@ -189,4 +190,18 @@ pub async fn github_cancel(_state: State<'_, AppState>, repo: String, run_id: u6
 #[tauri::command]
 pub async fn list_github_notifications(_state: State<'_, AppState>) -> Result<Vec<notifications::Notification>, String> {
     tauri::async_runtime::spawn_blocking(notifications::list_notifications).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn get_pr_diff(_state: State<'_, AppState>, repo: String, number: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::get_pr_diff(&repo, number))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn get_pr_review_threads(_state: State<'_, AppState>, repo: String, number: u64) -> Result<Vec<pr_review::ReviewThread>, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::get_pr_review_threads(&repo, number))
+        .await
+        .map_err(|e| e.to_string())?
 }
