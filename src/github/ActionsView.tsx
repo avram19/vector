@@ -48,6 +48,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
   const [jobsByRun, setJobsByRun] = useState<Record<number, Job[]>>({});
   const [openWf, setOpenWf] = useState<number | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
+  const [openFavRun, setOpenFavRun] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadFavRuns = useCallback(() => {
@@ -82,6 +83,16 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
   const toggleRun = (run: Run) => {
     if (openRun === run.id) { setOpenRun(null); return; }
     setOpenRun(run.id);
+    if (!jobsByRun[run.id]) {
+      invoke<Job[]>("list_github_jobs", { repo: run.repo, runId: run.id })
+        .then((js) => setJobsByRun((m) => ({ ...m, [run.id]: js })))
+        .catch((e) => setError(String(e)));
+    }
+  };
+
+  const toggleFavRun = (run: Run) => {
+    if (openFavRun === run.id) { setOpenFavRun(null); return; }
+    setOpenFavRun(run.id);
     if (!jobsByRun[run.id]) {
       invoke<Job[]>("list_github_jobs", { repo: run.repo, runId: run.id })
         .then((js) => setJobsByRun((m) => ({ ...m, [run.id]: js })))
@@ -152,16 +163,29 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
         {favRuns?.map((r) => (
           <div className="gh-fav" key={`${r.repo}-${r.id}`}>
             <div className="gh-fav-top">
-              <div className="gh-fav-title" onClick={() => onRepo(r.repo)} title={`${r.repo} · ${r.workflowName}`}>
+              <div className="gh-fav-title" onClick={() => onRepo(r.repo)} title={`Open ${r.repo} in the Repository section below`}>
                 <span className="gh-fav-repo">{r.repo}</span>
                 <span className="gh-fav-wf">{r.workflowName}</span>
               </div>
               <button className="gh-job-log" onClick={() => openRunLog(r)}>Logs</button>
             </div>
-            <div className="gh-fav-run" onClick={() => onRepo(r.repo)}>
+            <div className="gh-fav-run" onClick={() => toggleFavRun(r)}>
+              <span className="gh-caret">{openFavRun === r.id ? "▾" : "▸"}</span>
               <StatusGlyph status={r.status} conclusion={r.conclusion} />
               <span className="gh-run-n">#{r.runNumber}</span> · <span className="gh-run-branch">{r.branch}</span> · {r.event} · {relTime(r.createdAt)}
             </div>
+            {openFavRun === r.id && (jobsByRun[r.id] ?? []).map((job) => (
+              <div className="gh-job" key={job.id}>
+                <StatusGlyph status={job.status} conclusion={job.conclusion} />
+                <span className="gh-job-name">{job.name}</span>
+                {job.status === "completed" ? (
+                  <button className="gh-job-log" onClick={() => openLog(r, job)}>Logs</button>
+                ) : (
+                  <span className="gh-job-running">running…</span>
+                )}
+              </div>
+            ))}
+            {openFavRun === r.id && !jobsByRun[r.id] && <div className="gh-placeholder">Loading jobs…</div>}
           </div>
         ))}
       </div>
