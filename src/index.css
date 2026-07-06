@@ -417,3 +417,7 @@ body.theme-light {
 .prv-dialog .btn-primary:disabled { opacity: 0.6; cursor: default; }
 .prv-dialog .btn-ghost { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-muted); border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
 .prv-dialog .btn-ghost:hover { color: var(--gh-fg); }
+
+/* ── standalone pop-out window shell ──────────────*/
+.prv-standalone { height: 100vh; width: 100vw; position: relative; display: flex; flex-direction: column; background: var(--elev, #14141c); }
+.theme-light .prv-standalone { background: var(--elev, #eee8d5); }

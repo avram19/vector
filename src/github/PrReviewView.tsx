@@ -40,7 +40,7 @@ function splitIntoFiles(raw: string): FileDiff[] {
   return files.map((f) => ({ ...f, lineNumbers: computeLineNumbers(f.lines) }));
 }
 
-export function PrReviewView({ repo, number }: { repo: string; number: number }) {
+export function PrReviewView({ repo, number, standalone }: { repo: string; number: number; standalone?: boolean }) {
   const [diffFiles, setDiffFiles] = useState<FileDiff[] | null>(null);
   const [threads, setThreads] = useState<ReviewThread[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +152,9 @@ export function PrReviewView({ repo, number }: { repo: string; number: number })
       <div className="prv-head">
         <div className="prv-h1">
           <span className="t">PR #{number}</span>
+          {!standalone && (
+            <a className="ext-link" onClick={() => invoke("open_pr_review_window", { repo, number })}>⧉ New window</a>
+          )}
           <a className="ext-link" onClick={() => invoke("open_path", { path: `https://github.com/${repo}/pull/${number}` })}>↗ Open on GitHub</a>
         </div>
         {error && <div className="prv-error" onClick={() => setError(null)}>{error}</div>}

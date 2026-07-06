@@ -708,6 +708,26 @@ async fn open_path(path: String) -> Result<(), String> {
     spawn.map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Spawn (or focus, if already open) a standalone OS window containing only
+/// the PR review UI for `repo`#`number`. Vector's first use of multiple
+/// webview windows — deliberately narrow, not a general multi-window framework.
+#[tauri::command]
+async fn open_pr_review_window(app: tauri::AppHandle, repo: String, number: u64) -> Result<(), String> {
+    let sanitized_repo = repo.replace('/', "-");
+    let label = format!("pr-review-{sanitized_repo}-{number}");
+    if let Some(existing) = app.get_webview_window(&label) {
+        existing.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    let url = format!("index.html?prReview={}%2F{}", repo.replace('/', "%2F"), number);
+    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(url.into()))
+        .title(format!("PR #{number} · {repo}"))
+        .inner_size(900.0, 700.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 
 #[tauri::command]
 fn read_agent_cwd(state: State<'_, AppState>, session_id: String) -> Option<String> {
@@ -844,6 +864,7 @@ fn main() {
             github::resolve_review_thread,
             github::submit_pr_review,
             github::merge_pr,
+            open_pr_review_window,
         ])
         .setup(|app| {
             github::notifications::spawn_poller(app.handle().clone());
