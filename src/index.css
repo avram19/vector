@@ -354,3 +354,64 @@ body.theme-light {
 /* ── Tab strip ────────────────────────────────────────────── */
 .tab-dot-pr{width:7px;height:7px;border-radius:50%;background:#7aa7e0;flex:0 0 auto;margin-right:2px}
 .gh-pr-unread { width: 7px; height: 7px; border-radius: 50%; background: var(--gh-accent); flex: 0 0 auto; }
+
+/* ── PR review view ───────────────────────────────────────── */
+.prv { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; background: var(--elev, #14141c); color: var(--gh-fg); }
+.theme-light .prv { background: var(--elev, #eee8d5); }
+.prv-empty { padding: 16px; color: var(--gh-muted); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 13px; }
+.prv-head { padding: 12px 18px; border-bottom: 1px solid var(--gh-border); display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+.prv-h1 { display: flex; align-items: center; gap: 10px; }
+.prv-h1 .t { font-size: 14.5px; color: var(--gh-fg); font-weight: 600; flex: 1; min-width: 0; }
+.ext-link { display: flex; align-items: center; gap: 5px; color: var(--gh-muted); font-size: 11.5px; text-decoration: none; cursor: pointer; }
+.ext-link:hover { color: var(--gh-accent); }
+.prv-error { color: #f85149; font-size: 11.5px; cursor: pointer; }
+.prv-body { flex: 1; overflow: auto; padding: 0 0 90px; min-height: 0; }
+.diff-file { border-bottom: 1px solid var(--gh-border); }
+.diff-fh { padding: 8px 18px; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--gh-muted); background: var(--elev-hi, #1c1c26); position: sticky; top: 0; }
+.theme-light .diff-fh { background: var(--elev-hi, #e3dcc3); }
+.diff-line-wrap { position: relative; }
+.diff-line { position: relative; }
+.diff-addc { position: absolute; left: -2px; top: 1px; width: 16px; height: 16px; border-radius: 4px; background: var(--gh-accent-solid); color: #fff; font-size: 11px; display: none; align-items: center; justify-content: center; cursor: pointer; }
+.diff-line:hover .diff-addc { display: flex; }
+.thread { margin: 2px 18px 10px 34px; border: 1px solid var(--gh-border); border-radius: 9px; background: var(--elev-hi, #1c1c26); overflow: hidden; }
+.theme-light .thread { background: var(--elev-hi, #e3dcc3); }
+.thread.resolved { opacity: 0.55; }
+.thread-h { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--gh-border); font-size: 11.5px; color: var(--gh-muted); }
+.thread-h .rs { margin-left: auto; font-size: 10.5px; color: var(--gh-muted); background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+.thread-h .rs:hover { color: var(--gh-fg); }
+.thread-h .resolved-tag { margin-left: auto; font-size: 10px; color: #2ea043; }
+.cmt { display: flex; gap: 8px; padding: 9px 10px; font-size: 12px; }
+.cmt + .cmt { border-top: 1px solid var(--gh-border); }
+.cmt b { color: var(--gh-fg); font-weight: 600; font-size: 11.5px; }
+.cmt .when { color: var(--gh-faint); font-size: 10.5px; margin-left: 6px; font-weight: 400; }
+.cmt .body2 { color: var(--gh-muted); font-size: 12px; margin-top: 2px; line-height: 1.5; }
+.draft-note { margin: 2px 18px 10px 34px; padding: 8px 10px; border: 1px dashed var(--gh-accent); border-radius: 9px; background: rgba(58,95,138,0.1); display: flex; flex-direction: column; gap: 6px; }
+.draft-note textarea { background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; color: var(--gh-fg); padding: 6px 8px; font-size: 11.5px; outline: 0; resize: vertical; min-height: 48px; font-family: inherit; }
+.draft-note button { align-self: flex-end; font-size: 10.5px; color: var(--gh-muted); background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+.draft-note button:hover { color: var(--gh-fg); }
+.prv-bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 18px; background: var(--elev-hi, #1c1c26); border-top: 1px solid var(--gh-border); display: flex; align-items: center; gap: 8px; box-shadow: 0 -8px 24px rgba(0,0,0,0.3); }
+.theme-light .prv-bar { background: var(--elev-hi, #e3dcc3); }
+.prv-bar .cnt2 { color: var(--gh-faint); font-size: 11.5px; margin-right: auto; }
+.btn-review { border-radius: 7px; padding: 7px 14px; font-size: 12px; cursor: pointer; border: 1px solid var(--gh-border); background: transparent; color: var(--gh-fg); }
+.btn-review:hover { filter: brightness(1.15); }
+.btn-review.approve { border-color: rgba(46,160,67,0.5); color: #7ee0a0; }
+.btn-review.approve:hover { background: rgba(46,160,67,0.12); }
+.btn-review.request { border-color: rgba(248,81,73,0.5); color: #f6969c; }
+.btn-review.request:hover { background: rgba(248,81,73,0.12); }
+.btn-merge { background: #a371f7; border: 0; color: #fff; border-radius: 7px; padding: 7px 14px; font-size: 12px; cursor: pointer; }
+.btn-merge:disabled { opacity: 0.6; cursor: default; }
+
+/* ── PR review dialogs (review summary + merge) ──────────────*/
+.prv-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.prv-dialog { width: 400px; max-width: 90vw; background: var(--gh-pop-bg); border: 1px solid var(--gh-border); border-radius: 12px; padding: 18px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+.prv-dialog h3 { margin: 0 0 4px; font-size: 14px; color: var(--gh-fg); }
+.prv-dialog .pr-ref { color: var(--gh-muted); font-size: 11.5px; margin-bottom: 14px; }
+.prv-dialog textarea { width: 100%; box-sizing: border-box; background: var(--gh-input-bg); border: 1px solid var(--gh-border); border-radius: 6px; color: var(--gh-fg); padding: 8px; font-size: 12px; outline: 0; resize: vertical; min-height: 70px; font-family: inherit; margin: 8px 0 14px; }
+.methodrow { display: flex; gap: 6px; margin-bottom: 14px; }
+.method { flex: 1; text-align: center; padding: 8px 6px; border: 1px solid var(--gh-border); border-radius: 8px; font-size: 11.5px; color: var(--gh-muted); cursor: pointer; }
+.method.sel { border-color: #a371f7; color: #fff; background: rgba(163,113,247,0.16); }
+.prv-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.prv-dialog .btn-primary { background: var(--gh-accent-solid); border: 0; color: #fff; border-radius: 7px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+.prv-dialog .btn-primary:disabled { opacity: 0.6; cursor: default; }
+.prv-dialog .btn-ghost { background: transparent; border: 1px solid var(--gh-border); color: var(--gh-muted); border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+.prv-dialog .btn-ghost:hover { color: var(--gh-fg); }

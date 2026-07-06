@@ -23,6 +23,7 @@ import logoUrl from "./logo.png";
 import { PreviewPane, PreviewPaneHandle } from "./preview/PreviewPane";
 import { registerPreviewLinkProvider } from "./preview/linkProvider";
 import { Sidebar } from "./sidebar/Sidebar";
+import { PrReviewView } from "./github/PrReviewView";
 import { makeCwdSniffer } from "./shell/cwdSniffer";
 import { makeAutocompleteAddon } from "./shell/autocompleteAddon";
 
@@ -3540,7 +3541,6 @@ function PaneView(props: PaneViewProps) {
           );
         }
         if (leaf.kind === "prReview") {
-          // Placeholder pane body — the real PrReviewView lands in a later task.
           return (
             <div
               key={leaf.id}
@@ -3553,9 +3553,7 @@ function PaneView(props: PaneViewProps) {
               }}
               onMouseDown={() => onFocusPane(leaf.id)}
             >
-              <div className="pane-body" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted, #888)" }}>
-                PR #{leaf.number} · {leaf.repo}
-              </div>
+              <PrReviewView repo={leaf.repo} number={leaf.number} />
             </div>
           );
         }

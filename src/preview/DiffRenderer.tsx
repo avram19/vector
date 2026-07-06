@@ -26,7 +26,7 @@ function languageForExt(ext: string): string {
   return CODE_GRAMMARS[ext] ?? "text";
 }
 
-type DiffLine =
+export type DiffLine =
   | { kind: "context"; text: string }
   | { kind: "add"; text: string }
   | { kind: "del"; text: string }
@@ -134,7 +134,7 @@ function DiffLineRow({ line, lang, theme }: { line: DiffLine; lang: string; them
   );
 }
 
-function parseDiff(text: string): DiffLine[] {
+export function parseDiff(text: string): DiffLine[] {
   const out: DiffLine[] = [];
   for (const raw of text.split("\n")) {
     if (
