@@ -30,6 +30,10 @@ pub struct ClaudeProfile {
     pub folders: Vec<String>,
     #[serde(default)]
     pub created_ms: u64,
+    /// GitHub repos (owner/name) visible in the GitHub tab when this profile is
+    /// the one resolved for the focused tab. `None` = unfiltered (show everything).
+    #[serde(default)]
+    pub github_repos: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

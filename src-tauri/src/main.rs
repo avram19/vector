@@ -294,6 +294,7 @@ struct ClaudeProfileDto {
     created_ms: u64,
     config_dir: String,
     signed_in_email: Option<String>,
+    github_repos: Option<Vec<String>>,
 }
 
 fn profile_to_dto(p: &config::ClaudeProfile) -> ClaudeProfileDto {
@@ -307,6 +308,7 @@ fn profile_to_dto(p: &config::ClaudeProfile) -> ClaudeProfileDto {
         created_ms: p.created_ms,
         config_dir: dir.to_string_lossy().to_string(),
         signed_in_email: email,
+        github_repos: p.github_repos.clone(),
     }
 }
 
@@ -473,6 +475,7 @@ async fn create_claude_profile(
             color,
             folders,
             created_ms: config::now_ms(),
+            github_repos: None,
         };
         // Pre-create the config dir so first launch doesn't race.
         let profile_dir = config::profile_config_dir(&id);
@@ -514,6 +517,7 @@ async fn update_claude_profile(
     name: Option<String>,
     color: Option<String>,
     folders: Option<Vec<String>>,
+    github_repos: Option<Option<Vec<String>>>,
 ) -> Result<ClaudeProfileDto, String> {
     let mut profiles = state.profiles.lock();
     let prof = profiles.profiles.iter_mut().find(|p| p.id == id)
@@ -525,6 +529,7 @@ async fn update_claude_profile(
     }
     if let Some(c) = color { prof.color = c; }
     if let Some(f) = folders { prof.folders = f; }
+    if let Some(gr) = github_repos { prof.github_repos = gr; }
     let dto = profile_to_dto(prof);
     config::save_profiles(&profiles).map_err(|e| e.to_string())?;
     Ok(dto)
