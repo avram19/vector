@@ -369,7 +369,7 @@ function migrateNodeDroppingPreviews(node: any): PaneNode | null {
   return null;
 }
 
-function migrateTab(raw: any): Tab {
+function migrateTab(raw: any): Tab | null {
   const userTitle = typeof raw?.userTitle === "string" && raw.userTitle.trim() ? raw.userTitle.trim() : undefined;
   if (raw && raw.root) {
     const migratedRoot = migrateNodeDroppingPreviews(raw.root);
@@ -379,7 +379,11 @@ function migrateTab(raw: any): Tab {
         : firstLeafId(migratedRoot);
       return { ...(raw as Tab), root: migratedRoot, activePaneId, userTitle };
     }
-    // Root collapsed entirely — fall through to default-leaf construction.
+    // A lone PR-review leaf collapses to a null root by design — drop the tab
+    // entirely instead of resurrecting it as a blank shell tab.
+    if (raw.root.kind === "prReview") return null;
+    // Root collapsed entirely (e.g. an old lone preview-only tab) — fall
+    // through to default-leaf construction.
   }
   // Old flat shape (or fully collapsed root) → single-leaf tree.
   const paneId = crypto.randomUUID();
@@ -488,7 +492,7 @@ function loadSavedTabs(): Tab[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(migrateTab);
+    return parsed.map(migrateTab).filter((t): t is Tab => t !== null);
   } catch { return []; }
 }
 function saveTabs(tabs: Tab[]) {
@@ -876,9 +880,10 @@ export default function App() {
       // conversation for its project (claude --continue).
       const saved = loadSavedTabs();
       if (saved.length > 0) {
-        const restored: Tab[] = saved.map((raw) => {
-          const t = migrateTab(raw);
-          return {
+        const restored: Tab[] = saved
+          .map((raw) => migrateTab(raw))
+          .filter((t): t is Tab => t !== null)
+          .map((t) => ({
             ...t,
             root: mapAllLeaves(t.root, (leaf) => {
               if (!isPtyLeaf(leaf)) return leaf;
@@ -888,11 +893,12 @@ export default function App() {
                 continueLatest: leaf.resumeId ? leaf.continueLatest : true,
               };
             }),
-          };
-        });
-        setTabs(restored);
-        setActiveId(restored[0].id);
-        setPicker({ open: false });
+          }));
+        if (restored.length > 0) {
+          setTabs(restored);
+          setActiveId(restored[0].id);
+          setPicker({ open: false });
+        }
       }
       tabsLoaded.current = true;
     })();
@@ -1034,6 +1040,7 @@ export default function App() {
       const tab = prev.find((t) => t.id === activeIdRef.current);
       if (!tab) return prev;
       const activeLeaf = findLeaf(tab.root, tab.activePaneId);
+      if (activeLeaf && activeLeaf.kind === "prReview") return prev;
       const agentId = (activeLeaf && isPtyLeaf(activeLeaf) ? activeLeaf.agentId : undefined) ?? defaultAgent;
       const { root: newRoot, newLeafId } = splitLeaf(tab.root, tab.activePaneId, direction, agentId);
       return prev.map((t) => t.id === tab.id ? { ...t, root: newRoot, activePaneId: newLeafId } : t);

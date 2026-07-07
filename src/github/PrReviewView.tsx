@@ -174,7 +174,10 @@ export function PrReviewView({ repo, number, standalone }: { repo: string; numbe
                 <div key={i} className="diff-line-wrap">
                   <div className={`diff-line diff-${line.kind}`} onClick={() => commentable && addDraft(f.path, lineNum)}>
                     <span className="diff-gutter">{line.kind === "add" ? "+" : line.kind === "del" ? "-" : " "}</span>
-                    <span className="diff-content">{line.text}</span>
+                    <span className="diff-content">{(() => {
+                      const prefix = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
+                      return line.text.startsWith(prefix) ? line.text.slice(1) : line.text;
+                    })()}</span>
                     {commentable && (
                       <span className="diff-addc" onClick={(e) => { e.stopPropagation(); addDraft(f.path, lineNum); }}>+</span>
                     )}
