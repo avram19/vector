@@ -634,10 +634,8 @@ export default function App() {
 
   // Dev-only debug helper: window.__vectorDebugInjectPreview("/path/to/file") delegates
   // to the real openPreview orchestrator (slot-reuse when not pinned).
-  const dragFromRef = useRef<number | null>(null);
   type DndPayload = { kind: "pane"; fromTabId: string; paneId: string } | { kind: "tab"; tabId: string };
   const dndRef = useRef<DndPayload | null>(null);
-  const getDnd = useCallback(() => dndRef.current, []);
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [renamingPaneId, setRenamingPaneId] = useState<string | null>(null);
@@ -1450,47 +1448,101 @@ export default function App() {
     }
     return tabEls.length;
   };
-  const tabBar = (
-    <div
-      className="tabs-container"
-      onDragOver={(e) => {
-        const d = dndRef.current;
-        if (!d) return;
-        // Always allow drops in the strip; keeps the cursor as "move" and
-        // prevents the webview's default green-"+" / forbidden indicator.
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (d.kind === "tab") {
-          const idx = computeTabDropIndex(e.currentTarget as HTMLElement, e.clientX);
-          if (idx !== tabDropIndex) setTabDropIndex(idx);
-        }
-      }}
-      onDragLeave={(e) => {
-        // Only clear when the cursor actually leaves the strip (not when it
-        // crosses a child boundary).
-        const target = e.currentTarget as HTMLElement;
-        const related = e.relatedTarget as Node | null;
-        if (!related || !target.contains(related)) setTabDropIndex(null);
-      }}
-      onDrop={(e) => {
-        const d = dndRef.current;
-        if (!d) return;
-        e.preventDefault();
-        if (d.kind === "pane") {
-          dndRef.current = null;
-          setTabDropIndex(null);
-          movePaneToNewTab(d.fromTabId, d.paneId);
+
+  // Custom pointer-based drag-and-drop for tabs and panes. Tauri's native
+  // `dragDropEnabled: true` (needed so dropping files from Finder into a pane
+  // exposes real file paths — see the drag-drop useEffect further down) takes
+  // over the WebView's HTML5 Drag and Drop API, silently breaking any
+  // `draggable`/`dragstart`/`dragover`/`drop`-based UI. This mousedown → move
+  // → mouseup implementation never touches HTML5 DnD, so it coexists with the
+  // native file-drop feature. Each `.pane` div carries `data-pane-id`/
+  // `data-tab-id` so a drop target can be identified via `elementFromPoint`
+  // (`prReview` leaves deliberately omit these attributes — a PR review tab
+  // can never be split into, mirroring the existing "never inside a
+  // PaneSplit" invariant, so hit-testing naturally no-ops there).
+  const beginDrag = (
+    e: React.MouseEvent,
+    payload: DndPayload,
+    onDropAt: (x: number, y: number) => void,
+    onMoveAt?: (x: number, y: number) => void,
+  ) => {
+    if (e.button !== 0) return;
+    // Without this, the browser's default mousedown behavior starts a native
+    // text-selection drag alongside our own pointer-tracked one, since this
+    // is a plain mousedown handler (not `draggable`-attribute HTML5 DnD).
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const THRESHOLD = 4;
+    let dragging = false;
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientX - startX) < THRESHOLD && Math.abs(ev.clientY - startY) < THRESHOLD) return;
+        dragging = true;
+        dndRef.current = payload;
+      }
+      onMoveAt?.(ev.clientX, ev.clientY);
+    };
+    const onMouseUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      if (dragging) onDropAt(ev.clientX, ev.clientY);
+      dndRef.current = null;
+      setTabDropIndex(null);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
+  const paneDropTargetAt = (x: number, y: number): { toTabId: string; targetPaneId: string; edge: "left" | "right" | "top" | "bottom" } | null => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const paneEl = el?.closest(".pane") as HTMLElement | null;
+    const targetPaneId = paneEl?.dataset.paneId;
+    const toTabId = paneEl?.dataset.tabId;
+    if (!paneEl || !targetPaneId || !toTabId) return null;
+    const r = paneEl.getBoundingClientRect();
+    const dx = (x - r.left) / r.width;
+    const dy = (y - r.top) / r.height;
+    const edge: "left" | "right" | "top" | "bottom" =
+      Math.min(dx, 1 - dx) < Math.min(dy, 1 - dy) ? (dx < 0.5 ? "left" : "right") : (dy < 0.5 ? "top" : "bottom");
+    return { toTabId, targetPaneId, edge };
+  };
+
+  const beginTabDrag = (e: React.MouseEvent, fromIndex: number, tabId: string) => {
+    beginDrag(
+      e,
+      { kind: "tab", tabId },
+      (x, y) => {
+        const el = document.elementFromPoint(x, y) as HTMLElement | null;
+        const container = el?.closest(".tabs-container") as HTMLElement | null;
+        if (container) {
+          moveTab(fromIndex, computeTabDropIndex(container, x));
           return;
         }
-        // tab kind
-        const from = dragFromRef.current;
-        const to = computeTabDropIndex(e.currentTarget as HTMLElement, e.clientX);
-        dragFromRef.current = null;
-        dndRef.current = null;
-        setTabDropIndex(null);
-        if (from != null) moveTab(from, to);
-      }}
-    >
+        const target = paneDropTargetAt(x, y);
+        if (target) onPaneDrop(target.toTabId, target.targetPaneId, target.edge);
+      },
+      (x, y) => {
+        const el = document.elementFromPoint(x, y) as HTMLElement | null;
+        const container = el?.closest(".tabs-container") as HTMLElement | null;
+        setTabDropIndex(container ? computeTabDropIndex(container, x) : null);
+      },
+    );
+  };
+
+  const beginPaneDrag = (e: React.MouseEvent, fromTabId: string, paneId: string) => {
+    beginDrag(e, { kind: "pane", fromTabId, paneId }, (x, y) => {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      if (el?.closest(".tabs-container") || el?.closest(".tab-new")) {
+        movePaneToNewTab(fromTabId, paneId);
+        return;
+      }
+      const target = paneDropTargetAt(x, y);
+      if (target && target.targetPaneId !== paneId) onPaneDrop(target.toTabId, target.targetPaneId, target.edge);
+    });
+  };
+  const tabBar = (
+    <div className="tabs-container">
       <div className="tabs">
         {tabs.map((t, i) => {
           const activeLeaf = findLeaf(t.root, t.activePaneId);
@@ -1522,19 +1574,7 @@ export default function App() {
               className={classes.join(" ")}
               onClick={() => setActiveId(t.id)}
               title={`⌘${i + 1} · ${agentLabel} · ${tabCwd}`}
-              draggable={!isRenaming}
-              onDragStart={(e) => {
-                dragFromRef.current = i;
-                dndRef.current = { kind: "tab", tabId: t.id };
-                // Some webviews require dataTransfer data for drop events to fire.
-                e.dataTransfer.effectAllowed = "move";
-                try { e.dataTransfer.setData("text/plain", String(i)); } catch {}
-              }}
-              onDragEnd={() => {
-                dragFromRef.current = null;
-                dndRef.current = null;
-                setTabDropIndex(null);
-              }}
+              onMouseDown={(e) => { if (!isRenaming) beginTabDrag(e, i, t.id); }}
             >
               {prReviewLeaf
                 ? <span className="tab-dot tab-dot-pr" title="PR review" />
@@ -1580,18 +1620,6 @@ export default function App() {
           className="tab-new"
           onClick={openPickerForNewTab}
           title="New tab (⌘T)"
-          onDragOver={(e) => {
-            if (dndRef.current?.kind !== "pane") return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-          }}
-          onDrop={(e) => {
-            const d = dndRef.current;
-            if (d?.kind !== "pane") return;
-            e.preventDefault();
-            dndRef.current = null;
-            movePaneToNewTab(d.fromTabId, d.paneId);
-          }}
         >+</button>
       </div>
     </div>
@@ -1862,11 +1890,8 @@ export default function App() {
                 onTitle={onTitle}
                 onExitPane={(pid) => closePane(t.id, pid)}
                 onResize={(sid, ratio) => setSplitRatio(t.id, sid, ratio)}
-                onPaneDragStart={(pid) => { dndRef.current = { kind: "pane", fromTabId: t.id, paneId: pid }; }}
-                onPaneDragEnd={() => { dndRef.current = null; }}
+                onPaneDragBegin={(e, pid) => beginPaneDrag(e, t.id, pid)}
                 onPaneDrop={(targetPid, edge) => onPaneDrop(t.id, targetPid, edge)}
-                getDndKind={() => dndRef.current?.kind ?? null}
-                getDndPaneId={() => dndRef.current?.kind === "pane" ? dndRef.current.paneId : null}
                 onSessionStart={markLeafStarted}
                 onSessionId={captureLeafSession}
                 paneTitles={paneTitles}
@@ -1889,6 +1914,7 @@ export default function App() {
                 onOpenUsage={() => setUsageOpen(true)}
                 onToggleShell={toggleShell}
                 onLeafShellChange={updateLeafShell}
+                onCloseTab={() => closeTab(t.id)}
               />
             </div>
           ))}
@@ -2524,6 +2550,7 @@ function ProfilesSection({ profiles, onChanged }: { profiles: ClaudeProfileDto[]
           mode={dialog.mode}
           initial={dialog.mode === "edit" ? dialog.profile : undefined}
           onClose={() => setDialog(null)}
+          onChanged={onChanged}
           onSaved={async () => { setDialog(null); await onChanged(); }}
         />
       )}
@@ -2581,10 +2608,11 @@ type ClaudeHomeValidation = {
   credentialsInKeychain: boolean;
 };
 
-function ProfileDialog({ mode, initial, onClose, onSaved }: {
+function ProfileDialog({ mode, initial, onClose, onChanged, onSaved }: {
   mode: "create" | "edit";
   initial?: ClaudeProfileDto;
   onClose: () => void;
+  onChanged: () => void | Promise<void>;
   onSaved: () => void | Promise<void>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -2592,6 +2620,16 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
   const [folders, setFolders] = useState<string[]>(initial?.folders ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // `mode`/`initial` are this dialog's initial props. Once a "create" flow
+  // successfully creates the profile, we flip these locally to "edit" (and
+  // stash the new DTO) so the same dialog keeps editing it in place — that's
+  // how the GitHub-repo picker below becomes available without a separate
+  // re-open step (a brand-new profile has no id for update_claude_profile
+  // to target until it exists).
+  const [effectiveMode, setEffectiveMode] = useState(mode);
+  const [savedProfile, setSavedProfile] = useState<ClaudeProfileDto | null>(initial ?? null);
+  const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set(initial?.githubRepos ?? []));
 
   // Seed-from is create-mode only. Defaults to ~/.claude; user can override.
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -2647,24 +2685,31 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
     const trimmed = name.trim();
     if (!trimmed) { setError("Name is required"); return; }
     // If the user picked a seed path but it's invalid, block save.
-    if (mode === "create" && seedPath.trim() && seedValidation && !seedValidation.valid) {
+    if (effectiveMode === "create" && seedPath.trim() && seedValidation && !seedValidation.valid) {
       setError("Seed folder isn't a Claude home. Clear it to start fresh, or pick a valid folder.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      if (mode === "create") {
-        await invoke("create_claude_profile", {
+      if (effectiveMode === "create") {
+        // Create, then keep the dialog open in edit mode so GitHub repo
+        // visibility can be configured in the same flow — a brand-new
+        // profile has no id until this call returns.
+        const dto = await invoke<ClaudeProfileDto>("create_claude_profile", {
           name: trimmed,
           color,
           folders,
           seedFrom: seedPath.trim() || null,
         });
-      } else if (initial) {
-        await invoke("update_claude_profile", { id: initial.id, name: trimmed, color, folders });
+        setSavedProfile(dto);
+        setEffectiveMode("edit");
+        await onChanged();
+      } else if (savedProfile) {
+        const githubRepos = selectedRepos.size > 0 ? [...selectedRepos] : null;
+        await invoke("update_claude_profile", { id: savedProfile.id, name: trimmed, color, folders, githubRepos });
+        await onSaved();
       }
-      await onSaved();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -2672,12 +2717,12 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
     }
   };
 
-  const canShowAdvanced = mode === "create";
+  const canShowAdvanced = effectiveMode === "create";
 
   return (
     <div className="picker-overlay" onClick={onClose} style={{ zIndex: 60 }}>
       <div className="picker-card profile-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{mode === "create" ? "New profile" : "Edit profile"}</h3>
+        <h3>{effectiveMode === "create" ? "New profile" : "Edit profile"}</h3>
         <div className="profile-field">
           <label>Name</label>
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Work" autoFocus />
@@ -2735,16 +2780,17 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
           </details>
         )}
         {error && <div style={{ color: "#ff5a5a", fontSize: 12 }}>{error}</div>}
-        {mode === "edit" && initial && (
-          <GithubReposPicker
-            profile={initial}
-            onSaved={() => { /* re-fetch happens via onSaved(await onChanged()) at the ProfilesSection level */ onSaved(); }}
+        {effectiveMode === "edit" && savedProfile && (
+          <GithubRepoSelector
+            profileName={savedProfile.name}
+            selected={selectedRepos}
+            onChange={setSelectedRepos}
           />
         )}
         <div className="profile-dialog-foot">
           <button onClick={onClose} disabled={busy}>Cancel</button>
           <button className="btn-primary" onClick={save} disabled={busy || !name.trim()}>
-            {mode === "create" ? "Create profile" : "Save"}
+            {effectiveMode === "create" ? "Create profile" : "Save"}
           </button>
         </div>
       </div>
@@ -2752,12 +2798,13 @@ function ProfileDialog({ mode, initial, onClose, onSaved }: {
   );
 }
 
-function GithubReposPicker({ profile, onSaved }: { profile: ClaudeProfileDto; onSaved: (next: ClaudeProfileDto) => void }) {
+function GithubRepoSelector({ profileName, selected, onChange }: {
+  profileName: string;
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
   const [allRepos, setAllRepos] = useState<{ nameWithOwner: string }[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set(profile.githubRepos ?? []));
   const [query, setQuery] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     invoke<{ nameWithOwner: string }[]>("get_cached_github_repos").then(setAllRepos).catch(() => {});
@@ -2765,35 +2812,26 @@ function GithubReposPicker({ profile, onSaved }: { profile: ClaudeProfileDto; on
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? allRepos.filter((r) => r.nameWithOwner.toLowerCase().includes(q)) : allRepos;
-  }, [allRepos, query]);
+    const matches = q ? allRepos.filter((r) => r.nameWithOwner.toLowerCase().includes(q)) : allRepos;
+    // Selected repos float to the top, so a large repo list doesn't bury
+    // what's already checked below hundreds of unchecked ones.
+    return [...matches].sort((a, b) => {
+      const aSel = selected.has(a.nameWithOwner) ? 0 : 1;
+      const bSel = selected.has(b.nameWithOwner) ? 0 : 1;
+      return aSel - bSel;
+    });
+  }, [allRepos, query, selected]);
 
   const toggle = (name: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      return next;
-    });
-  };
-
-  const save = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const githubRepos = selected.size > 0 ? [...selected] : null;
-      const dto = await invoke<ClaudeProfileDto>("update_claude_profile", { id: profile.id, githubRepos });
-      onSaved(dto);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
-    }
+    const next = new Set(selected);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    onChange(next);
   };
 
   return (
     <div className="profile-github-repos">
-      <label className="field-label">GitHub repos visible for &ldquo;{profile.name}&rdquo;</label>
-      <p className="field-hint">Unchecked ⇒ this profile shows every repo you have access to.</p>
+      <label className="field-label">GitHub repos visible for &ldquo;{profileName}&rdquo;</label>
+      <p className="field-hint">Unchecked ⇒ this profile shows every repo you have access to. Selections are saved with the profile's Save button below.</p>
       <input
         className="profile-github-search"
         placeholder="Search your repos…"
@@ -2812,12 +2850,8 @@ function GithubReposPicker({ profile, onSaved }: { profile: ClaudeProfileDto; on
       </div>
       <div className="profile-github-foot">
         <span className="field-hint">{selected.size} of {allRepos.length} selected</span>
-        <button type="button" className="link-btn" onClick={() => setSelected(new Set())}>Clear all</button>
+        <button type="button" className="link-btn" onClick={() => onChange(new Set())}>Clear all</button>
       </div>
-      {error && <div style={{ color: "#ff5a5a", fontSize: 12 }}>{error}</div>}
-      <button type="button" className="btn-primary" disabled={saving} onClick={save}>
-        {saving ? "Saving…" : "Save repo visibility"}
-      </button>
     </div>
   );
 }
@@ -3278,11 +3312,8 @@ type PaneViewProps = {
   onTitle: (tabId: string, paneId: string, title: string) => void;
   onExitPane: (paneId: string) => void;
   onResize: (splitId: string, ratio: number) => void;
-  onPaneDragStart: (paneId: string) => void;
-  onPaneDragEnd: () => void;
+  onPaneDragBegin: (e: React.MouseEvent, paneId: string) => void;
   onPaneDrop: (targetPaneId: string, edge: "left" | "right" | "top" | "bottom") => void;
-  getDndKind: () => "pane" | "tab" | null;
-  getDndPaneId: () => string | null;
   onSessionStart?: (leafId: string, epoch: number) => void;
   onSessionId?: (leafId: string, sessionId: string) => void;
   paneTitles: Record<string, string>;
@@ -3302,6 +3333,7 @@ type PaneViewProps = {
   onOpenUsage?: () => void;
   onToggleShell: (leafId: string) => void;
   onLeafShellChange: (leafId: string, patch: Partial<NonNullable<PtyLeaf["shell"]>>) => void;
+  onCloseTab: () => void;
 };
 
 function PaneTitleBar({
@@ -3316,8 +3348,7 @@ function PaneTitleBar({
   onCommitRename,
   onCancelRename,
   onClose,
-  onDragStart,
-  onDragEnd,
+  onDragBegin,
   onResetClick,
 }: {
   leaf: PtyLeaf;
@@ -3331,17 +3362,13 @@ function PaneTitleBar({
   onCommitRename: () => void;
   onCancelRename: () => void;
   onClose: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
+  onDragBegin: (e: React.MouseEvent) => void;
   onResetClick?: () => void;
 }) {
   return (
     <div
       className="pane-titlebar"
-      draggable={!renaming}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={renaming ? undefined : onDragBegin}
       title="Drag to move pane"
     >
       <span className="pane-grip-dots">⋮⋮</span>
@@ -3390,8 +3417,7 @@ function PreviewPaneTitleBar({
   jumpCol,
   showClose,
   onClose,
-  onDragStart,
-  onDragEnd,
+  onDragBegin,
   onActionsClick,
 }: {
   filePath: string;
@@ -3399,8 +3425,7 @@ function PreviewPaneTitleBar({
   jumpCol?: number;
   showClose: boolean;
   onClose: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
+  onDragBegin: (e: React.MouseEvent) => void;
   onActionsClick?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
   const fileName = filePath.split("/").pop() || filePath;
@@ -3408,10 +3433,7 @@ function PreviewPaneTitleBar({
   return (
     <div
       className="pane-titlebar"
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={onDragBegin}
       title={filePath}
     >
       <span className="pane-grip-dots">⋮⋮</span>
@@ -3458,7 +3480,7 @@ function computeDividers(node: PaneNode, rect: [number, number, number, number])
 }
 
 function PaneView(props: PaneViewProps) {
-  const { tabId, root, activePaneId, tabVisible, theme, themeKind, fontFamily, fontSize, onFocusPane, onBell, onTitle, onExitPane, onResize, onPaneDragStart, onPaneDragEnd, onPaneDrop, getDndKind, getDndPaneId, onSessionStart, onSessionId, paneTitles, renamingPaneId, paneRenameDraft, onStartPaneRename, onPaneRenameDraft, onCommitPaneRename, onCancelPaneRename, onClosePane, onOpenPreview, themeStaleByPane, themeBannerDismissed, onRestartPane, onDismissThemeBanner, ctxResetText, onOpenUsage, onToggleShell, onLeafShellChange } = props;
+  const { tabId, root, activePaneId, tabVisible, theme, themeKind, fontFamily, fontSize, onFocusPane, onBell, onTitle, onExitPane, onResize, onPaneDragBegin, onPaneDrop, onSessionStart, onSessionId, paneTitles, renamingPaneId, paneRenameDraft, onStartPaneRename, onPaneRenameDraft, onCommitPaneRename, onCancelPaneRename, onClosePane, onOpenPreview, themeStaleByPane, themeBannerDismissed, onRestartPane, onDismissThemeBanner, ctxResetText, onOpenUsage, onToggleShell, onLeafShellChange, onCloseTab } = props;
   const leaves = flattenLeaves(root);
   const rects = leafRects(root, [0, 0, 1, 1]);
   const dividers = computeDividers(root, [0, 0, 1, 1]);
@@ -3482,6 +3504,8 @@ function PaneView(props: PaneViewProps) {
             <div
               key={leaf.id}
               className={`pane${isActive ? " pane-active" : ""}${single ? " pane-solo" : ""}`}
+              data-pane-id={leaf.id}
+              data-tab-id={tabId}
               style={{
                 position: "absolute",
                 left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`,
@@ -3489,27 +3513,6 @@ function PaneView(props: PaneViewProps) {
                 overflow: "hidden",
               }}
               onMouseDown={() => onFocusPane(leaf.id)}
-              onDragOver={(e) => {
-                const kind = getDndKind();
-                if (!kind) return;
-                if (kind === "pane" && getDndPaneId() === leaf.id) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(e) => {
-                const kind = getDndKind();
-                if (!kind) return;
-                if (kind === "pane" && getDndPaneId() === leaf.id) return;
-                e.preventDefault();
-                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                const dx = (e.clientX - r.left) / r.width;
-                const dy = (e.clientY - r.top) / r.height;
-                const edge: "left" | "right" | "top" | "bottom" =
-                  Math.min(dx, 1 - dx) < Math.min(dy, 1 - dy)
-                    ? (dx < 0.5 ? "left" : "right")
-                    : (dy < 0.5 ? "top" : "bottom");
-                onPaneDrop(leaf.id, edge);
-              }}
             >
               {!single && (
                 <PreviewPaneTitleBar
@@ -3518,12 +3521,7 @@ function PaneView(props: PaneViewProps) {
                   jumpCol={leaf.jumpCol}
                   showClose={leaves.length > 1}
                   onClose={() => onClosePane(leaf.id)}
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "move";
-                    try { e.dataTransfer.setData("text/plain", "pane"); } catch {}
-                    onPaneDragStart(leaf.id);
-                  }}
-                  onDragEnd={() => onPaneDragEnd()}
+                  onDragBegin={(e) => onPaneDragBegin(e, leaf.id)}
                   onActionsClick={(e) => {
                     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
                     previewRefs.current.get(leaf.id)?.openActions(r);
@@ -3561,7 +3559,7 @@ function PaneView(props: PaneViewProps) {
               }}
               onMouseDown={() => onFocusPane(leaf.id)}
             >
-              <PrReviewView repo={leaf.repo} number={leaf.number} />
+              <PrReviewView repo={leaf.repo} number={leaf.number} onCloseTab={onCloseTab} />
             </div>
           );
         }
@@ -3569,6 +3567,8 @@ function PaneView(props: PaneViewProps) {
           <div
             key={leaf.id}
             className={`pane${isActive ? " pane-active" : ""}${single ? " pane-solo" : ""}`}
+            data-pane-id={leaf.id}
+            data-tab-id={tabId}
             style={{
               position: "absolute",
               left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`,
@@ -3576,27 +3576,6 @@ function PaneView(props: PaneViewProps) {
               overflow: "hidden",
             }}
             onMouseDown={() => onFocusPane(leaf.id)}
-            onDragOver={(e) => {
-              const kind = getDndKind();
-              if (!kind) return;
-              if (kind === "pane" && getDndPaneId() === leaf.id) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "move";
-            }}
-            onDrop={(e) => {
-              const kind = getDndKind();
-              if (!kind) return;
-              if (kind === "pane" && getDndPaneId() === leaf.id) return;
-              e.preventDefault();
-              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              const dx = (e.clientX - r.left) / r.width;
-              const dy = (e.clientY - r.top) / r.height;
-              const edge: "left" | "right" | "top" | "bottom" =
-                Math.min(dx, 1 - dx) < Math.min(dy, 1 - dy)
-                  ? (dx < 0.5 ? "left" : "right")
-                  : (dy < 0.5 ? "top" : "bottom");
-              onPaneDrop(leaf.id, edge);
-            }}
           >
             {!single && (
               <PaneTitleBar
@@ -3611,12 +3590,7 @@ function PaneView(props: PaneViewProps) {
                 onCommitRename={onCommitPaneRename}
                 onCancelRename={onCancelPaneRename}
                 onClose={() => onClosePane(leaf.id)}
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = "move";
-                  try { e.dataTransfer.setData("text/plain", "pane"); } catch {}
-                  onPaneDragStart(leaf.id);
-                }}
-                onDragEnd={() => onPaneDragEnd()}
+                onDragBegin={(e) => onPaneDragBegin(e, leaf.id)}
                 onResetClick={onOpenUsage}
               />
             )}
