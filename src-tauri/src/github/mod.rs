@@ -207,6 +207,27 @@ pub async fn get_pr_review_threads(_state: State<'_, AppState>, repo: String, nu
 }
 
 #[tauri::command]
+pub async fn get_pr_comments(_state: State<'_, AppState>, repo: String, number: u64) -> Result<Vec<pr_review::ReviewComment>, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::get_pr_comments(&repo, number))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn add_pr_comment(_state: State<'_, AppState>, repo: String, number: u64, body: String) -> Result<pr_review::ReviewComment, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::add_pr_comment(&repo, number, &body))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn get_pr_details(_state: State<'_, AppState>, repo: String, number: u64) -> Result<pr_review::PrDetails, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::get_pr_details(&repo, number))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn start_or_get_pending_review(_state: State<'_, AppState>, repo: String, number: u64) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || pr_review::start_pending_review(&repo, number))
         .await
@@ -214,8 +235,8 @@ pub async fn start_or_get_pending_review(_state: State<'_, AppState>, repo: Stri
 }
 
 #[tauri::command]
-pub async fn add_review_comment(_state: State<'_, AppState>, review_id: String, path: String, line: u32, body: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || pr_review::add_review_comment(&review_id, &path, line, &body))
+pub async fn add_review_comment(_state: State<'_, AppState>, review_id: String, path: String, line: u32, side: String, body: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::add_review_comment(&review_id, &path, line, &side, &body))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -223,6 +244,20 @@ pub async fn add_review_comment(_state: State<'_, AppState>, review_id: String, 
 #[tauri::command]
 pub async fn resolve_review_thread(_state: State<'_, AppState>, thread_id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || pr_review::resolve_review_thread(&thread_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn unresolve_review_thread(_state: State<'_, AppState>, thread_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::unresolve_review_thread(&thread_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn reply_to_review_thread(_state: State<'_, AppState>, thread_id: String, body: String) -> Result<pr_review::ReviewComment, String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::reply_to_review_thread(&thread_id, &body))
         .await
         .map_err(|e| e.to_string())?
 }

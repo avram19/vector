@@ -61,8 +61,8 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
   useEffect(() => { loadFavRuns(); }, [loadFavRuns]);
 
   useEffect(() => {
-    invoke<{ nameWithOwner: string }[]>("get_cached_github_repos")
-      .then((rs) => setAllRepos(rs.map((r) => r.nameWithOwner)))
+    invoke<{ nameWithOwner: string; isArchived: boolean }[]>("get_cached_github_repos")
+      .then((rs) => setAllRepos(rs.filter((r) => !r.isArchived).map((r) => r.nameWithOwner)))
       .catch(() => {});
   }, []);
 
@@ -88,7 +88,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
     if (!jobsByRun[run.id]) {
       invoke<Job[]>("list_github_jobs", { repo: run.repo, runId: run.id })
         .then((js) => setJobsByRun((m) => ({ ...m, [run.id]: js })))
-        .catch((e) => setError(String(e)));
+        .catch((e) => { setError(String(e)); setJobsByRun((m) => ({ ...m, [run.id]: [] })); });
     }
   };
 
@@ -98,7 +98,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
     if (!jobsByRun[run.id]) {
       invoke<Job[]>("list_github_jobs", { repo: run.repo, runId: run.id })
         .then((js) => setJobsByRun((m) => ({ ...m, [run.id]: js })))
-        .catch((e) => setError(String(e)));
+        .catch((e) => { setError(String(e)); setJobsByRun((m) => ({ ...m, [run.id]: [] })); });
     }
   };
 
@@ -191,6 +191,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
               </div>
             ))}
             {openFavRun === r.id && !jobsByRun[r.id] && <div className="gh-placeholder">Loading jobs…</div>}
+            {openFavRun === r.id && jobsByRun[r.id] && jobsByRun[r.id].length === 0 && <div className="gh-placeholder">No jobs found.</div>}
           </div>
         ))}
       </div>
@@ -244,6 +245,7 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                   </div>
                 ))}
                 {openRun === run.id && !jobsByRun[run.id] && <div className="gh-placeholder">Loading jobs…</div>}
+                {openRun === run.id && jobsByRun[run.id] && jobsByRun[run.id].length === 0 && <div className="gh-placeholder">No jobs found.</div>}
               </div>
             ))}
             {openWf === wf.id && !runsByWf[wf.id] && <div className="gh-placeholder">Loading runs…</div>}

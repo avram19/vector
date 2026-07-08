@@ -170,8 +170,8 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
   // All repos that have open PRs (from the repos cache) — the dropdown source,
   // so any repo whose PR-count badge you click is selectable and shows its PRs.
   useEffect(() => {
-    invoke<{ nameWithOwner: string; openPrCount: number }[]>("get_cached_github_repos")
-      .then((repos) => setAllRepos(repos.filter((r) => r.openPrCount > 0).map((r) => r.nameWithOwner)))
+    invoke<{ nameWithOwner: string; openPrCount: number; isArchived: boolean }[]>("get_cached_github_repos")
+      .then((repos) => setAllRepos(repos.filter((r) => r.openPrCount > 0 && !r.isArchived).map((r) => r.nameWithOwner)))
       .catch(() => {});
   }, []);
 

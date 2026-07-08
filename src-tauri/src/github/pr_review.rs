@@ -18,6 +18,10 @@ pub struct ReviewThread {
     pub id: String,
     pub path: String,
     pub line: Option<u32>,
+    /// "LEFT" (comment on a deleted/old-file line) or "RIGHT" (added/context,
+    /// new-file line) — GitHub tracks these as separate line spaces, so a
+    /// thread's `line` must be paired with `side` to know which one it means.
+    pub side: String,
     pub is_resolved: bool,
     pub comments: Vec<ReviewComment>,
 }
@@ -33,12 +37,83 @@ pub fn get_pr_diff(repo: &str, number: u64) -> Result<String, String> {
     ])
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewerStatus {
+    pub login: String,
+    /// "APPROVED" or "CHANGES_REQUESTED" only — GraphQL's
+    /// `latestOpinionatedReviews` already excludes COMMENTED/PENDING/DISMISSED,
+    /// i.e. it's each reviewer's current opinionated stance, not their full
+    /// review history.
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrDetails {
+    pub title: String,
+    /// PR description — empty string if the author left it blank.
+    pub body: String,
+    pub reviewers: Vec<ReviewerStatus>,
+}
+
+const DETAILS_QUERY: &str = r#"query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      title
+      body
+      latestOpinionatedReviews(last: 25) {
+        nodes { author { login } state }
+      }
+    }
+  }
+}"#;
+
+/// Title + description + each reviewer's current approve/request-changes
+/// stance, for the review header and status bar.
+pub fn get_pr_details(repo: &str, number: u64) -> Result<PrDetails, String> {
+    let (owner, name) = repo.split_once('/').ok_or_else(|| format!("bad repo slug: {repo}"))?;
+    let raw = client::run_gh(&[
+        "api",
+        "graphql",
+        "-f",
+        &format!("query={DETAILS_QUERY}"),
+        "-f",
+        &format!("owner={owner}"),
+        "-f",
+        &format!("name={name}"),
+        "-F",
+        &format!("number={number}"),
+    ])?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
+    if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
+        let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
+        return Err(msg.to_string());
+    }
+    let pr = &v["data"]["repository"]["pullRequest"];
+    let reviewers = pr["latestOpinionatedReviews"]["nodes"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .map(|r| ReviewerStatus {
+            login: r["author"]["login"].as_str().unwrap_or_default().to_string(),
+            state: r["state"].as_str().unwrap_or_default().to_string(),
+        })
+        .collect();
+    Ok(PrDetails {
+        title: pr["title"].as_str().unwrap_or_default().to_string(),
+        body: pr["body"].as_str().unwrap_or_default().to_string(),
+        reviewers,
+    })
+}
+
 const THREADS_QUERY: &str = r#"query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) {
         nodes {
-          id isResolved path line
+          id isResolved path line originalLine diffSide
           comments(first: 50) {
             nodes { id body createdAt author { login avatarUrl } }
           }
@@ -75,10 +150,20 @@ pub fn get_pr_review_threads(repo: &str, number: u64) -> Result<Vec<ReviewThread
         .unwrap_or_default();
     let threads = nodes
         .iter()
-        .map(|t| ReviewThread {
+        .map(|t| {
+            let side = t["diffSide"].as_str().unwrap_or("RIGHT").to_string();
+            // GitHub only populates `line` for RIGHT-side threads and
+            // `originalLine` for LEFT-side (deleted-line) threads.
+            let line = if side == "LEFT" {
+                t["originalLine"].as_u64().map(|n| n as u32)
+            } else {
+                t["line"].as_u64().map(|n| n as u32)
+            };
+            ReviewThread {
             id: t["id"].as_str().unwrap_or_default().to_string(),
             path: t["path"].as_str().unwrap_or_default().to_string(),
-            line: t["line"].as_u64().map(|n| n as u32),
+            line,
+            side,
             is_resolved: t["isResolved"].as_bool().unwrap_or(false),
             comments: t["comments"]["nodes"]
                 .as_array()
@@ -93,9 +178,115 @@ pub fn get_pr_review_threads(repo: &str, number: u64) -> Result<Vec<ReviewThread
                     created_at: c["createdAt"].as_str().unwrap_or_default().to_string(),
                 })
                 .collect(),
+            }
         })
         .collect();
     Ok(threads)
+}
+
+/// PR node id, needed by mutations that take a `subjectId`/`pullRequestId`
+/// rather than a `repo`+`number` pair (`addPullRequestReview`, `addComment`).
+fn resolve_pr_node_id(repo: &str, number: u64) -> Result<String, String> {
+    let (owner, name) = repo.split_once('/').ok_or_else(|| format!("bad repo slug: {repo}"))?;
+    let raw = client::run_gh(&[
+        "api",
+        "graphql",
+        "-f",
+        "query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id}}}",
+        "-f",
+        &format!("owner={owner}"),
+        "-f",
+        &format!("name={name}"),
+        "-F",
+        &format!("number={number}"),
+    ])?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
+    v["data"]["repository"]["pullRequest"]["id"]
+        .as_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "could not resolve PR node id".to_string())
+}
+
+const PR_COMMENTS_QUERY: &str = r#"query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      comments(first: 100) {
+        nodes { id body createdAt author { login avatarUrl } }
+      }
+    }
+  }
+}"#;
+
+/// PR-level "conversation" comments — top-level, not tied to any file/line,
+/// distinct from inline review-thread comments (`get_pr_review_threads`).
+pub fn get_pr_comments(repo: &str, number: u64) -> Result<Vec<ReviewComment>, String> {
+    let (owner, name) = repo.split_once('/').ok_or_else(|| format!("bad repo slug: {repo}"))?;
+    let raw = client::run_gh(&[
+        "api",
+        "graphql",
+        "-f",
+        &format!("query={PR_COMMENTS_QUERY}"),
+        "-f",
+        &format!("owner={owner}"),
+        "-f",
+        &format!("name={name}"),
+        "-F",
+        &format!("number={number}"),
+    ])?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
+    if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
+        let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
+        return Err(msg.to_string());
+    }
+    let nodes = v["data"]["repository"]["pullRequest"]["comments"]["nodes"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    Ok(nodes
+        .iter()
+        .map(|c| ReviewComment {
+            id: c["id"].as_str().unwrap_or_default().to_string(),
+            author: c["author"]["login"].as_str().unwrap_or_default().to_string(),
+            author_avatar: c["author"]["avatarUrl"].as_str().map(|s| s.to_string()),
+            body: c["body"].as_str().unwrap_or_default().to_string(),
+            created_at: c["createdAt"].as_str().unwrap_or_default().to_string(),
+        })
+        .collect())
+}
+
+const ADD_PR_COMMENT_MUTATION: &str = r#"mutation($subjectId: ID!, $body: String!) {
+  addComment(input: { subjectId: $subjectId, body: $body }) {
+    commentEdge { node { id body createdAt author { login avatarUrl } } }
+  }
+}"#;
+
+/// Posts immediately (top-level PR comments aren't part of the pending-review
+/// batch — same reasoning as replying to an existing review thread).
+pub fn add_pr_comment(repo: &str, number: u64, body: &str) -> Result<ReviewComment, String> {
+    let pr_node_id = resolve_pr_node_id(repo, number)?;
+    let raw = client::run_gh(&[
+        "api",
+        "graphql",
+        "-f",
+        &format!("query={ADD_PR_COMMENT_MUTATION}"),
+        "-f",
+        &format!("subjectId={pr_node_id}"),
+        "-f",
+        &format!("body={body}"),
+    ])?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
+    if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
+        let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
+        return Err(msg.to_string());
+    }
+    let c = &v["data"]["addComment"]["commentEdge"]["node"];
+    Ok(ReviewComment {
+        id: c["id"].as_str().unwrap_or_default().to_string(),
+        author: c["author"]["login"].as_str().unwrap_or_default().to_string(),
+        author_avatar: c["author"]["avatarUrl"].as_str().map(|s| s.to_string()),
+        body: c["body"].as_str().unwrap_or_default().to_string(),
+        created_at: c["createdAt"].as_str().unwrap_or_default().to_string(),
+    })
 }
 
 const START_REVIEW_MUTATION: &str = r#"mutation($pullRequestId: ID!) {
@@ -110,24 +301,7 @@ const START_REVIEW_MUTATION: &str = r#"mutation($pullRequestId: ID!) {
 /// (the frontend only calls this once per PrReviewView session, on first
 /// inline comment).
 pub fn start_pending_review(repo: &str, number: u64) -> Result<String, String> {
-    let (owner, name) = repo.split_once('/').ok_or_else(|| format!("bad repo slug: {repo}"))?;
-    let id_raw = client::run_gh(&[
-        "api",
-        "graphql",
-        "-f",
-        "query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id}}}",
-        "-f",
-        &format!("owner={owner}"),
-        "-f",
-        &format!("name={name}"),
-        "-F",
-        &format!("number={number}"),
-    ])?;
-    let id_v: serde_json::Value = serde_json::from_str(&id_raw).map_err(|e| format!("bad gh JSON: {e}"))?;
-    let pr_node_id = id_v["data"]["repository"]["pullRequest"]["id"]
-        .as_str()
-        .ok_or("could not resolve PR node id")?
-        .to_string();
+    let pr_node_id = resolve_pr_node_id(repo, number)?;
 
     let raw = client::run_gh(&[
         "api",
@@ -148,13 +322,15 @@ pub fn start_pending_review(repo: &str, number: u64) -> Result<String, String> {
         .ok_or_else(|| "no review id returned".to_string())
 }
 
-const ADD_COMMENT_MUTATION: &str = r#"mutation($reviewId: ID!, $path: String!, $line: Int!, $body: String!) {
-  addPullRequestReviewThread(input: { pullRequestReviewId: $reviewId, path: $path, line: $line, body: $body }) {
+const ADD_COMMENT_MUTATION: &str = r#"mutation($reviewId: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: String!) {
+  addPullRequestReviewThread(input: { pullRequestReviewId: $reviewId, path: $path, line: $line, side: $side, body: $body }) {
     thread { id }
   }
 }"#;
 
-pub fn add_review_comment(review_id: &str, path: &str, line: u32, body: &str) -> Result<(), String> {
+/// `side` must be "LEFT" (a deleted/old-file line) or "RIGHT" (added/context,
+/// new-file line) — matches `ReviewThread.side`'s semantics.
+pub fn add_review_comment(review_id: &str, path: &str, line: u32, side: &str, body: &str) -> Result<(), String> {
     let raw = client::run_gh(&[
         "api",
         "graphql",
@@ -166,6 +342,8 @@ pub fn add_review_comment(review_id: &str, path: &str, line: u32, body: &str) ->
         &format!("path={path}"),
         "-F",
         &format!("line={line}"),
+        "-f",
+        &format!("side={side}"),
         "-f",
         &format!("body={body}"),
     ])?;
@@ -196,6 +374,62 @@ pub fn resolve_review_thread(thread_id: &str) -> Result<(), String> {
         return Err(msg.to_string());
     }
     Ok(())
+}
+
+const UNRESOLVE_THREAD_MUTATION: &str = r#"mutation($threadId: ID!) {
+  unresolveReviewThread(input: { threadId: $threadId }) { thread { id } }
+}"#;
+
+pub fn unresolve_review_thread(thread_id: &str) -> Result<(), String> {
+    let raw = client::run_gh(&[
+        "api",
+        "graphql",
+        "-f",
+        &format!("query={UNRESOLVE_THREAD_MUTATION}"),
+        "-f",
+        &format!("threadId={thread_id}"),
+    ])?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
+    if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
+        let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
+        return Err(msg.to_string());
+    }
+    Ok(())
+}
+
+const REPLY_MUTATION: &str = r#"mutation($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
+    comment { id body createdAt author { login avatarUrl } }
+  }
+}"#;
+
+/// Replying to an EXISTING thread posts immediately (matches GitHub's own
+/// behavior) — unlike starting a brand-new thread, which batches into the
+/// viewer's pending review. No review id needed here.
+pub fn reply_to_review_thread(thread_id: &str, body: &str) -> Result<ReviewComment, String> {
+    let raw = client::run_gh(&[
+        "api",
+        "graphql",
+        "-f",
+        &format!("query={REPLY_MUTATION}"),
+        "-f",
+        &format!("threadId={thread_id}"),
+        "-f",
+        &format!("body={body}"),
+    ])?;
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("bad gh JSON: {e}"))?;
+    if let Some(errors) = v.get("errors").and_then(|e| e.as_array()).filter(|a| !a.is_empty()) {
+        let msg = errors[0]["message"].as_str().unwrap_or("GraphQL error");
+        return Err(msg.to_string());
+    }
+    let c = &v["data"]["addPullRequestReviewThreadReply"]["comment"];
+    Ok(ReviewComment {
+        id: c["id"].as_str().unwrap_or_default().to_string(),
+        author: c["author"]["login"].as_str().unwrap_or_default().to_string(),
+        author_avatar: c["author"]["avatarUrl"].as_str().map(|s| s.to_string()),
+        body: c["body"].as_str().unwrap_or_default().to_string(),
+        created_at: c["createdAt"].as_str().unwrap_or_default().to_string(),
+    })
 }
 
 const SUBMIT_REVIEW_MUTATION: &str = r#"mutation($reviewId: ID!, $event: PullRequestReviewEvent!, $body: String!) {
