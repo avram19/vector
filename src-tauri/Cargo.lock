@@ -5488,7 +5488,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "anyhow",
  "dirs 5.0.1",
