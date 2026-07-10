@@ -159,20 +159,35 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
     return () => { alive = false; };
   }, [load]);
 
+  // Refetch the inbox plus, in repo mode, the filtered repo list — the one
+  // path shared by every non-mount refresh trigger below.
+  const refetchAll = useCallback(() => {
+    load(true);
+    if (repoFilter) {
+      invoke<PrPage>("list_github_repo_prs", { repo: repoFilter, after: null })
+        .then((page) => { setRepoPrs(page.prs); setRepoCursor(page.nextCursor); })
+        .catch(() => {});
+    }
+  }, [load, repoFilter]);
+
   // A review action in a PR tab/window (comment, request-changes, approve,
   // merge) broadcasts `pr:mutated`; refetch so the list reflects it at once.
   // Covers both the same-window tab and the separate standalone window.
   useEffect(() => {
-    const un = listen("pr:mutated", () => {
-      load(true);
-      if (repoFilter) {
-        invoke<PrPage>("list_github_repo_prs", { repo: repoFilter, after: null })
-          .then((page) => { setRepoPrs(page.prs); setRepoCursor(page.nextCursor); })
-          .catch(() => {});
-      }
-    });
+    const un = listen("pr:mutated", () => refetchAll());
     return () => { un.then((f) => f()); };
-  }, [load, repoFilter]);
+  }, [refetchAll]);
+
+  // The inbox has no realtime signal for changes made on github.com (new PRs,
+  // external reviews/merges), so keep it current without a manual refresh:
+  // refetch on window focus and on a slow 60s interval. Both skip while the
+  // page is hidden (minimized/occluded) — the interval re-checks each tick.
+  useEffect(() => {
+    const tick = () => { if (!document.hidden) refetchAll(); };
+    window.addEventListener("focus", tick);
+    const id = window.setInterval(tick, 60_000);
+    return () => { window.removeEventListener("focus", tick); window.clearInterval(id); };
+  }, [refetchAll]);
 
   const loadMoreTeam = () => {
     if (!teamCursor || teamMore) return;

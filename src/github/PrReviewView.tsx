@@ -424,6 +424,8 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
     return m;
   }, [threads]);
 
+  const unresolvedCount = useMemo(() => threads.filter((t) => !t.isResolved).length, [threads]);
+
   const ensureReviewId = useCallback(async (): Promise<string> => {
     if (reviewId) return reviewId;
     const id = await invoke<string>("start_or_get_pending_review", { repo, number });
@@ -766,7 +768,10 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
       </div>
       <div className="prv-bar">
         <div className="prv-bar-left">
-          <span className="cnt2">{drafts.length} pending comment{drafts.length === 1 ? "" : "s"}</span>
+          <span className="cnt2">
+            {drafts.length} pending comment{drafts.length === 1 ? "" : "s"}
+            {unresolvedCount > 0 && <> · {unresolvedCount} unresolved</>}
+          </span>
           {reviewers.map((r) => (
             <span key={r.login} className={`prv-review-chip ${r.state === "APPROVED" ? "ok" : "req"}`} title={`${r.login}: ${r.state === "APPROVED" ? "Approved" : "Changes requested"}`}>
               {r.state === "APPROVED" ? "✓" : "✕"} {r.login}
