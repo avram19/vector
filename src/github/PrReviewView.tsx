@@ -341,9 +341,14 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
   const [newCommentBody, setNewCommentBody] = useState("");
   const [postingComment, setPostingComment] = useState(false);
 
-  const load = useCallback(() => {
-    setError(null);
-    setRefreshing(true);
+  // `silent` is the 10s background poll: it must not spin/disable the header
+  // refresh button or clear a visible error on every tick. A user-initiated
+  // load (mount, manual button, post-action) passes silent=false.
+  const load = useCallback((silent = false) => {
+    if (!silent) {
+      setError(null);
+      setRefreshing(true);
+    }
     const details = invoke<{ title: string; body: string; author: string; headRef: string; baseRef: string; reviewers: { login: string; state: string }[] }>("get_pr_details", { repo, number })
       .then((d) => { setTitle(d.title); setPrBody(d.body); setAuthor(d.author); setHeadRef(d.headRef); setBaseRef(d.baseRef); setReviewers(d.reviewers); })
       .catch(() => {});
@@ -360,7 +365,7 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
     const comments = invoke<ReviewComment[]>("get_pr_comments", { repo, number })
       .then(setPrComments)
       .catch((e) => setError(String(e)));
-    Promise.allSettled([details, diff, reviewThreads, comments]).finally(() => setRefreshing(false));
+    Promise.allSettled([details, diff, reviewThreads, comments]).finally(() => { if (!silent) setRefreshing(false); });
   }, [repo, number]);
 
   useEffect(() => { load(); }, [load]);
@@ -380,7 +385,7 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
   useEffect(() => {
     if (!active) return;
     const id = window.setInterval(() => {
-      if (!document.hidden) load();
+      if (!document.hidden) load(true);
     }, 10_000);
     return () => window.clearInterval(id);
   }, [active, load]);
@@ -560,13 +565,13 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
       <div className="prv-empty">
         <p><b>Couldn't load PR #{number}</b></p>
         <p className="gh-muted">{error}</p>
-        <button className="gh-retry" onClick={load}>Retry</button>
+        <button className="gh-retry" onClick={() => load()}>Retry</button>
       </div>
     );
   }
   if (!diffFiles) return <div className="prv-empty">Loading PR #{number}…</div>;
 
-  const isOwnPr = !!viewerLogin && !!author && viewerLogin === author;
+  const isOwnPr = !!viewerLogin && !!author && viewerLogin.toLowerCase() === author.toLowerCase();
 
   return (
     <div className="prv">
