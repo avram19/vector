@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pr-review",
+  "description": "Core-command permissions for the standalone PR review pop-out window (label pr-review-*). Custom app commands aren't capability-gated, but the pop-out needs core:event to broadcast pr:mutated and core:window to close/retitle itself.",
+  "windows": ["pr-review-*"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-close",
+    "core:window:allow-set-title"
+  ]
+}

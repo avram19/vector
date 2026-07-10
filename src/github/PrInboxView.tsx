@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { RepoFilterDropdown } from "./RepoFilterDropdown";
 
 export type PullRequest = {
@@ -40,9 +41,9 @@ function initials(login: string): string {
 function Avatar({ pr }: { pr: PullRequest }) {
   const [failed, setFailed] = useState(false);
   if (pr.authorAvatar && !failed) {
-    return <img className="gh-pr-avatar" src={pr.authorAvatar} alt={pr.author} onError={() => setFailed(true)} />;
+    return <img className="gh-pr-avatar" src={pr.authorAvatar} alt={pr.author} title={pr.author} onError={() => setFailed(true)} />;
   }
-  return <span className="gh-pr-avatar gh-pr-avatar--fallback">{initials(pr.author)}</span>;
+  return <span className="gh-pr-avatar gh-pr-avatar--fallback" title={pr.author}>{initials(pr.author)}</span>;
 }
 
 function PrRow({ pr, onTrigger, unreadSet, onOpenPrReview }: {
@@ -157,6 +158,21 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
     ]).finally(() => { if (alive) load(false); });
     return () => { alive = false; };
   }, [load]);
+
+  // A review action in a PR tab/window (comment, request-changes, approve,
+  // merge) broadcasts `pr:mutated`; refetch so the list reflects it at once.
+  // Covers both the same-window tab and the separate standalone window.
+  useEffect(() => {
+    const un = listen("pr:mutated", () => {
+      load(true);
+      if (repoFilter) {
+        invoke<PrPage>("list_github_repo_prs", { repo: repoFilter, after: null })
+          .then((page) => { setRepoPrs(page.prs); setRepoCursor(page.nextCursor); })
+          .catch(() => {});
+      }
+    });
+    return () => { un.then((f) => f()); };
+  }, [load, repoFilter]);
 
   const loadMoreTeam = () => {
     if (!teamCursor || teamMore) return;

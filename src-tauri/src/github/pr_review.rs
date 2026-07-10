@@ -54,6 +54,12 @@ pub struct PrDetails {
     pub title: String,
     /// PR description — empty string if the author left it blank.
     pub body: String,
+    /// PR author login, for the review header ("by …").
+    pub author: String,
+    /// Source branch (the PR's own branch).
+    pub head_ref: String,
+    /// Target branch the PR merges into.
+    pub base_ref: String,
     pub reviewers: Vec<ReviewerStatus>,
 }
 
@@ -62,6 +68,9 @@ const DETAILS_QUERY: &str = r#"query($owner: String!, $name: String!, $number: I
     pullRequest(number: $number) {
       title
       body
+      author { login }
+      headRefName
+      baseRefName
       latestOpinionatedReviews(last: 25) {
         nodes { author { login } state }
       }
@@ -104,6 +113,9 @@ pub fn get_pr_details(repo: &str, number: u64) -> Result<PrDetails, String> {
     Ok(PrDetails {
         title: pr["title"].as_str().unwrap_or_default().to_string(),
         body: pr["body"].as_str().unwrap_or_default().to_string(),
+        author: pr["author"]["login"].as_str().unwrap_or_default().to_string(),
+        head_ref: pr["headRefName"].as_str().unwrap_or_default().to_string(),
+        base_ref: pr["baseRefName"].as_str().unwrap_or_default().to_string(),
         reviewers,
     })
 }

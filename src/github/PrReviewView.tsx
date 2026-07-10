@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { parseDiff, DiffLine } from "../preview/DiffRenderer";
 import { GithubIcon } from "../sidebar/Sidebar";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 // Same relative-time convention used across the other GitHub views
 // (PrInboxView, ActionsView) — human-readable instead of a raw ISO string.
@@ -269,6 +272,14 @@ function MessageIcon() {
   );
 }
 
+function RefreshIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v5h-5" />
+    </svg>
+  );
+}
+
 // Same anchored-to-the-far-edge drag pattern as FilelistDivider, mirrored:
 // the comments sidebar is pinned to the RIGHT edge, so dragging left grows it.
 function CommentsSidebarDivider({ width, onChange }: { width: number; onChange: (w: number) => void }) {
@@ -298,10 +309,21 @@ function CommentsSidebarDivider({ width, onChange }: { width: number; onChange: 
   return <div className="prv-comments-divider" onMouseDown={onMouseDown} />;
 }
 
-export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: string; number: number; standalone?: boolean; onCloseTab?: () => void }) {
+// `active` gates the 10s auto-refresh: false pauses polling when the review
+// isn't visible (a background in-app tab). Defaults to true — the standalone
+// window is always "active" and instead gates on `document.hidden`.
+export function PrReviewView({ repo, number, standalone, active = true, onCloseTab }: { repo: string; number: number; standalone?: boolean; active?: boolean; onCloseTab?: () => void }) {
   const [title, setTitle] = useState<string | null>(null);
   const [prBody, setPrBody] = useState<string>("");
+  const [author, setAuthor] = useState<string>("");
+  const [headRef, setHeadRef] = useState<string>("");
+  const [baseRef, setBaseRef] = useState<string>("");
   const [reviewers, setReviewers] = useState<{ login: string; state: string }[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  // Signed-in user, to hide Approve/Request-changes on your own PR (GitHub
+  // rejects a self-review). Fetched here so it works in the standalone window
+  // too, which has no access to the panel's auth state.
+  const [viewerLogin, setViewerLogin] = useState<string | null>(null);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [diffFiles, setDiffFiles] = useState<FileDiff[] | null>(null);
   const [threads, setThreads] = useState<ReviewThread[]>([]);
@@ -321,25 +343,55 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
 
   const load = useCallback(() => {
     setError(null);
-    invoke<{ title: string; body: string; reviewers: { login: string; state: string }[] }>("get_pr_details", { repo, number })
-      .then((d) => { setTitle(d.title); setPrBody(d.body); setReviewers(d.reviewers); })
+    setRefreshing(true);
+    const details = invoke<{ title: string; body: string; author: string; headRef: string; baseRef: string; reviewers: { login: string; state: string }[] }>("get_pr_details", { repo, number })
+      .then((d) => { setTitle(d.title); setPrBody(d.body); setAuthor(d.author); setHeadRef(d.headRef); setBaseRef(d.baseRef); setReviewers(d.reviewers); })
       .catch(() => {});
-    invoke<string>("get_pr_diff", { repo, number })
+    const diff = invoke<string>("get_pr_diff", { repo, number })
       .then((raw) => {
         const files = splitIntoFiles(raw);
         setDiffFiles(files);
         setActiveFile((prev) => prev ?? files[0]?.path ?? null);
       })
       .catch((e) => setError(String(e)));
-    invoke<ReviewThread[]>("get_pr_review_threads", { repo, number })
+    const reviewThreads = invoke<ReviewThread[]>("get_pr_review_threads", { repo, number })
       .then(setThreads)
       .catch((e) => setError(String(e)));
-    invoke<ReviewComment[]>("get_pr_comments", { repo, number })
+    const comments = invoke<ReviewComment[]>("get_pr_comments", { repo, number })
       .then(setPrComments)
       .catch((e) => setError(String(e)));
+    Promise.allSettled([details, diff, reviewThreads, comments]).finally(() => setRefreshing(false));
   }, [repo, number]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    invoke<{ login: string | null }>("gh_auth_status").then((s) => setViewerLogin(s.login)).catch(() => {});
+  }, []);
+
+  // Broadcasts to every window (including the main window hosting the PR list)
+  // so a mutation here refreshes the inbox immediately — the standalone review
+  // window is a separate webview, so a direct callback wouldn't reach it.
+  const notifyMutation = useCallback(() => emit("pr:mutated", { repo, number }).catch(() => {}), [repo, number]);
+
+  // Auto-refresh every 10s while the review is visible. `active` is false for a
+  // background in-app tab; `document.hidden` covers the standalone window being
+  // occluded/minimized. Re-checked each tick so it pauses/resumes live.
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
+      if (!document.hidden) load();
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, [active, load]);
+
+  // Standalone window opens with a title set at build time (no author yet).
+  // Refine it once details load so the OS window/title-bar shows the author.
+  useEffect(() => {
+    if (!standalone || !title) return;
+    const label = author ? `PR #${number} · ${author} · ${repo}` : `PR #${number} · ${repo}`;
+    getCurrentWindow().setTitle(label).catch(() => {});
+  }, [standalone, title, author, repo, number]);
 
   const selectFile = (path: string) => {
     setActiveFile(path);
@@ -452,6 +504,7 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
       const comment = await invoke<ReviewComment>("add_pr_comment", { repo, number, body });
       setPrComments((prev) => [...prev, comment]);
       setNewCommentBody("");
+      notifyMutation();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -473,6 +526,7 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
       setDrafts([]);
       setReviewDialog(null);
       load();
+      notifyMutation();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -488,6 +542,12 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
     try {
       await invoke("merge_pr", { repo, number, method: mergeMethod });
       setMergeDialogOpen(false);
+      // Await the broadcast so closing the window can't cancel the in-flight
+      // IPC before the PR list (in another window) receives it.
+      await notifyMutation();
+      // The PR is gone — close the review surface it was opened in.
+      if (standalone) getCurrentWindow().close().catch(() => {});
+      else onCloseTab?.();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -506,11 +566,22 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
   }
   if (!diffFiles) return <div className="prv-empty">Loading PR #{number}…</div>;
 
+  const isOwnPr = !!viewerLogin && !!author && viewerLogin === author;
+
   return (
     <div className="prv">
       <div className="prv-head">
         <div className="prv-h1">
           <span className="t">{title ?? `PR #${number}`}{title && <span className="prv-num">#{number}</span>}</span>
+          {author && <span className="prv-author">by {author}</span>}
+          {(headRef || baseRef) && (
+            <span className="prv-branches" title={`${headRef} → ${baseRef}`}>
+              <span className="prv-branch">{headRef}</span>
+              <span className="prv-branch-arrow">→</span>
+              <span className="prv-branch">{baseRef}</span>
+            </span>
+          )}
+          <span className="prv-h1-spacer" />
           <button
             type="button"
             className="prv-details-toggle"
@@ -518,6 +589,15 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
             onClick={() => setDetailsExpanded((v) => !v)}
           >
             <span className="thread-caret">{detailsExpanded ? "▾" : "▸"}</span> Details
+          </button>
+          <button
+            type="button"
+            className={`prv-icobtn${refreshing ? " spinning" : ""}`}
+            title="Refresh"
+            disabled={refreshing}
+            onClick={() => load()}
+          >
+            <RefreshIcon />
           </button>
           {!standalone && (
             <button
@@ -689,8 +769,9 @@ export function PrReviewView({ repo, number, standalone, onCloseTab }: { repo: s
           ))}
         </div>
         <button className="btn-review" onClick={() => setReviewDialog({ event: "COMMENT" })}>Comment</button>
-        <button className="btn-review request" onClick={() => setReviewDialog({ event: "REQUEST_CHANGES" })}>Request changes</button>
-        <button className="btn-review approve" onClick={() => setReviewDialog({ event: "APPROVE" })}>Approve</button>
+        {/* GitHub rejects approving/requesting-changes on your own PR — hide both when you're the author. */}
+        {!isOwnPr && <button className="btn-review request" onClick={() => setReviewDialog({ event: "REQUEST_CHANGES" })}>Request changes</button>}
+        {!isOwnPr && <button className="btn-review approve" onClick={() => setReviewDialog({ event: "APPROVE" })}>Approve</button>}
         <button className="btn-merge" onClick={() => setMergeDialogOpen(true)}>Merge…</button>
       </div>
 
@@ -725,6 +806,7 @@ function ReviewSummaryDialog({ kind, submitting, onCancel, onSubmit }: {
 }) {
   const [body, setBody] = useState("");
   const titles: Record<string, string> = { APPROVE: "Approve", REQUEST_CHANGES: "Request changes", COMMENT: "Comment" };
+  useEscapeToClose(onCancel);
   return (
     <div className="prv-overlay">
       <div className="prv-dialog">
@@ -751,6 +833,7 @@ function MergeDialog({ repo, number, method, onMethod, merging, onCancel, onConf
   onConfirm: () => void;
 }) {
   const labels: Record<string, string> = { merge: "Merge commit", squash: "Squash & merge", rebase: "Rebase" };
+  useEscapeToClose(onCancel);
   return (
     <div className="prv-overlay">
       <div className="prv-dialog">

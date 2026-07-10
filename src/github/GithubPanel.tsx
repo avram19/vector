@@ -6,7 +6,7 @@ import { ActionsView } from "./ActionsView";
 import { TriggerModal } from "./TriggerModal";
 import type { ClaudeProfileDto } from "../App";
 
-export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null };
+export type GhAuthStatus = { installed: boolean; authed: boolean; login: string | null; avatarUrl: string | null };
 
 type SubView = "repos" | "prs" | "actions";
 
@@ -56,6 +56,7 @@ export function GithubPanel({
   onOpenPrReview: (repo: string, number: number) => void;
 }) {
   const [auth, setAuth] = useState<GhAuthStatus | null>(null);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const [loading, setLoading] = useState(true);
   const [repoFilter, setRepoFilter] = useState<string | null>(null);
   const [actionsRepo, setActionsRepo] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export function GithubPanel({
     setLoading(true);
     invoke<GhAuthStatus>("gh_auth_status")
       .then(setAuth)
-      .catch(() => setAuth({ installed: false, authed: false, login: null }))
+      .catch(() => setAuth({ installed: false, authed: false, login: null, avatarUrl: null }))
       .finally(() => setLoading(false));
   }, []);
 
@@ -106,7 +107,9 @@ export function GithubPanel({
     <div className="gh-panel" onContextMenu={(e) => e.preventDefault()}>
       <div className="gh-head">
         <span className="gh-who">
-          <span className="gh-av" />
+          {auth.avatarUrl && !avatarBroken
+            ? <img className="gh-av" src={auth.avatarUrl} alt="" onError={() => setAvatarBroken(true)} />
+            : <span className="gh-av" />}
           <b>@{auth.login}</b>
           <span className="gh-muted">· gh authed</span>
         </span>

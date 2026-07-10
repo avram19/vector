@@ -21,7 +21,7 @@ export function FileContextMenu({
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
     };
     document.addEventListener("mousedown", onDocClick, true);
     document.addEventListener("keydown", onKey, true);

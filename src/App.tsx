@@ -24,6 +24,7 @@ import { PreviewPane, PreviewPaneHandle } from "./preview/PreviewPane";
 import { registerPreviewLinkProvider } from "./preview/linkProvider";
 import { Sidebar } from "./sidebar/Sidebar";
 import { PrReviewView } from "./github/PrReviewView";
+import { useEscapeToClose } from "./useEscapeToClose";
 import { makeCwdSniffer } from "./shell/cwdSniffer";
 import { makeAutocompleteAddon } from "./shell/autocompleteAddon";
 
@@ -809,6 +810,8 @@ export default function App() {
   const [update, setUpdate] = useState<Update | null>(null);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "downloading" | "ready" | "error">("idle");
   const [showNotes, setShowNotes] = useState(false);
+  useEscapeToClose(() => setShowNotes(false), showNotes);
+  useEscapeToClose(() => setUsageOpen(false), usageOpen);
   const [aggregateNotes, setAggregateNotes] = useState<{ markdown: string; versions: number } | null>(null);
   const [notesLoading, setNotesLoading] = useState(false);
   const [updateCheck, setUpdateCheck] = useState<null | "checking" | "uptodate" | "error">(null);
@@ -2109,6 +2112,9 @@ function PickerModal({
   const [preview, setPreview] = useState<SessionDetail | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const previewBodyRef = useRef<HTMLDivElement>(null);
+  // Only dismissable when there's somewhere to go back to — the initial,
+  // required picker (no onClose) must stay put.
+  useEscapeToClose(() => onClose?.(), !!onClose);
 
   useEffect(() => {
     if (!preview || !previewBodyRef.current) return;
@@ -2331,13 +2337,7 @@ function SettingsModal({
   const [customThemeDraft, setCustomThemeDraft] = useState<string>(() =>
     customTheme ? JSON.stringify(customTheme, null, 2) : ""
   );
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   const navItems: { id: SettingsSection; label: string; icon: ReactNode }[] = [
     { id: "appearance", label: "Appearance", icon: <PaletteIcon /> },
@@ -2655,11 +2655,7 @@ function ProfileDialog({ mode, initial, onClose, onChanged, onSaved }: {
     return () => window.clearTimeout(handle);
   }, [seedPath, mode]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   const addFolder = async () => {
     try {
@@ -2992,6 +2988,7 @@ function AgentSwitcher({
 }) {
   const [query, setQuery] = useState("");
   const [idx, setIdx] = useState(0);
+  useEscapeToClose(onClose);
 
   const entries = useMemo<{ id: string; label: string }[]>(() => [
     { id: "__shell__", label: "shell" },
@@ -3559,7 +3556,7 @@ function PaneView(props: PaneViewProps) {
               }}
               onMouseDown={() => onFocusPane(leaf.id)}
             >
-              <PrReviewView repo={leaf.repo} number={leaf.number} onCloseTab={onCloseTab} />
+              <PrReviewView repo={leaf.repo} number={leaf.number} active={tabVisible} onCloseTab={onCloseTab} />
             </div>
           );
         }
@@ -4223,7 +4220,7 @@ function TerminalContextMenu({ menu, onClose }: { menu: TermMenuData; onClose: (
     const onDoc = (e: MouseEvent) => {
       if (!(e.target as HTMLElement)?.closest(".link-ctx-menu")) onClose();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
     document.addEventListener("mousedown", onDoc, true);
     document.addEventListener("keydown", onKey, true);
     return () => {

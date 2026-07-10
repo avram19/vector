@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Workflow } from "./ActionsView";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 export type DispatchInput = {
   name: string; description: string | null; required: boolean;
@@ -18,6 +19,7 @@ export function TriggerModal({ repo, presetRef, presetWorkflowId, onClose }: {
   const [inputs, setInputs] = useState<DispatchInput[] | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [gitRef, setGitRef] = useState(presetRef ?? "");
+  useEscapeToClose(onClose);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

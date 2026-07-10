@@ -30,22 +30,28 @@ pub struct AuthStatus {
     pub installed: bool,
     pub authed: bool,
     pub login: Option<String>,
+    /// Avatar URL of the signed-in user, for the panel header.
+    pub avatar_url: Option<String>,
 }
 
-/// Determine gh install + auth state. Authed iff `gh api user` returns a login.
+/// Determine gh install + auth state. Authed iff `gh api user` returns a login;
+/// also grabs the avatar URL in the same round-trip (tab-separated).
 pub fn auth_status() -> AuthStatus {
     if gh_path().is_none() {
-        return AuthStatus { installed: false, authed: false, login: None };
+        return AuthStatus { installed: false, authed: false, login: None, avatar_url: None };
     }
-    match run_gh(&["api", "user", "--jq", ".login"]) {
+    match run_gh(&["api", "user", "--jq", "[.login, .avatar_url] | @tsv"]) {
         Ok(out) => {
-            let login = out.trim().to_string();
+            let line = out.trim();
+            let mut parts = line.split('\t');
+            let login = parts.next().unwrap_or("").to_string();
+            let avatar_url = parts.next().map(|s| s.to_string()).filter(|s| !s.is_empty());
             if login.is_empty() {
-                AuthStatus { installed: true, authed: false, login: None }
+                AuthStatus { installed: true, authed: false, login: None, avatar_url: None }
             } else {
-                AuthStatus { installed: true, authed: true, login: Some(login) }
+                AuthStatus { installed: true, authed: true, login: Some(login), avatar_url }
             }
         }
-        Err(_) => AuthStatus { installed: true, authed: false, login: None },
+        Err(_) => AuthStatus { installed: true, authed: false, login: None, avatar_url: None },
     }
 }
