@@ -7,6 +7,7 @@ import DOMPurify from "dompurify";
 import { parseDiff, DiffLine } from "../preview/DiffRenderer";
 import { GithubIcon } from "../sidebar/Sidebar";
 import { useEscapeToClose } from "../useEscapeToClose";
+import { useExternalLinks } from "../useExternalLinks";
 import { CopyLinkButton } from "./CopyLinkButton";
 
 // Same relative-time convention used across the other GitHub views
@@ -38,7 +39,9 @@ function authorColor(name: string): string {
 
 function CommentBody({ body }: { body: string }) {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(body, { async: false }) as string), [body]);
-  return <div className="cmt-html" dangerouslySetInnerHTML={{ __html: html }} />;
+  const ref = useRef<HTMLDivElement>(null);
+  useExternalLinks(ref);
+  return <div ref={ref} className="cmt-html" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 type DiffSide = "LEFT" | "RIGHT";

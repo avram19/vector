@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { marked, Renderer } from "marked";
 import DOMPurify from "dompurify";
 import { createPortal } from "react-dom";
+import { useExternalLinks } from "../useExternalLinks";
 import { MermaidRenderer } from "./MermaidRenderer";
 
 export function MarkdownRenderer({
@@ -149,6 +150,8 @@ export function MarkdownRenderer({
       }, 50);
     }
   }, [html, jumpLine]);
+
+  useExternalLinks(containerRef);
 
   return (
     <>
