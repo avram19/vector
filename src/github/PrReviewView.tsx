@@ -319,6 +319,8 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
   const [headRef, setHeadRef] = useState<string>("");
   const [baseRef, setBaseRef] = useState<string>("");
   const [reviewers, setReviewers] = useState<{ login: string; state: string }[]>([]);
+  const [mergeState, setMergeState] = useState("UNKNOWN");
+  const [canMergeAsAdmin, setCanMergeAsAdmin] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // Signed-in user, to hide Approve/Request-changes on your own PR (GitHub
   // rejects a self-review). Fetched here so it works in the standalone window
@@ -349,8 +351,12 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
       setError(null);
       setRefreshing(true);
     }
-    const details = invoke<{ title: string; body: string; author: string; headRef: string; baseRef: string; reviewers: { login: string; state: string }[] }>("get_pr_details", { repo, number })
-      .then((d) => { setTitle(d.title); setPrBody(d.body); setAuthor(d.author); setHeadRef(d.headRef); setBaseRef(d.baseRef); setReviewers(d.reviewers); })
+    const details = invoke<{ title: string; body: string; author: string; headRef: string; baseRef: string; reviewers: { login: string; state: string }[]; mergeStateStatus: string; viewerCanMergeAsAdmin: boolean }>("get_pr_details", { repo, number })
+      .then((d) => {
+        setTitle(d.title); setPrBody(d.body); setAuthor(d.author);
+        setHeadRef(d.headRef); setBaseRef(d.baseRef); setReviewers(d.reviewers);
+        setMergeState(d.mergeStateStatus); setCanMergeAsAdmin(d.viewerCanMergeAsAdmin);
+      })
       .catch(() => {});
     const diff = invoke<string>("get_pr_diff", { repo, number })
       .then((raw) => {
@@ -543,11 +549,12 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
 
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergeMethod, setMergeMethod] = useState<"merge" | "squash" | "rebase">("squash");
+  const [adminOverride, setAdminOverride] = useState(false);
   const [merging, setMerging] = useState(false);
   const doMerge = async () => {
     setMerging(true);
     try {
-      await invoke("merge_pr", { repo, number, method: mergeMethod });
+      await invoke("merge_pr", { repo, number, method: mergeMethod, admin: adminOverride });
       setMergeDialogOpen(false);
       // Await the broadcast so closing the window can't cancel the in-flight
       // IPC before the PR list (in another window) receives it.
@@ -782,7 +789,7 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
         {/* GitHub rejects approving/requesting-changes on your own PR — hide both when you're the author. */}
         {!isOwnPr && <button className="btn-review request" onClick={() => setReviewDialog({ event: "REQUEST_CHANGES" })}>Request changes</button>}
         {!isOwnPr && <button className="btn-review approve" onClick={() => setReviewDialog({ event: "APPROVE" })}>Approve</button>}
-        <button className="btn-merge" onClick={() => setMergeDialogOpen(true)}>Merge…</button>
+        <button className="btn-merge" onClick={() => { setAdminOverride(false); setMergeDialogOpen(true); }}>Merge…</button>
       </div>
 
       {reviewDialog && (
@@ -799,6 +806,10 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
           number={number}
           method={mergeMethod}
           onMethod={setMergeMethod}
+          mergeState={mergeState}
+          canMergeAsAdmin={canMergeAsAdmin}
+          adminOverride={adminOverride}
+          onAdminOverride={setAdminOverride}
           merging={merging}
           onCancel={() => setMergeDialogOpen(false)}
           onConfirm={doMerge}
@@ -833,16 +844,37 @@ function ReviewSummaryDialog({ kind, submitting, onCancel, onSubmit }: {
   );
 }
 
-function MergeDialog({ repo, number, method, onMethod, merging, onCancel, onConfirm }: {
+// Why each state does or doesn't get an override:
+//   BLOCKED/BEHIND — exactly what `gh pr merge --admin` is for.
+//   DIRTY          — a conflict; --admin cannot bypass it, so offering the
+//                    checkbox would only produce a confusing failure.
+//   UNSTABLE/HAS_HOOKS — a plain merge already succeeds; no override needed.
+//   CLEAN/UNKNOWN  — nothing to say.
+const MERGE_REASON: Record<string, string> = {
+  BLOCKED: "Blocked — required reviews or checks haven't passed.",
+  BEHIND: "Out of date — the base branch has moved on.",
+  DIRTY: "Conflicts with the base branch — resolve them first.",
+  UNSTABLE: "Some non-required checks are failing.",
+};
+
+function MergeDialog({ repo, number, method, onMethod, mergeState, canMergeAsAdmin, adminOverride, onAdminOverride, merging, onCancel, onConfirm }: {
   repo: string;
   number: number;
   method: "merge" | "squash" | "rebase";
   onMethod: (m: "merge" | "squash" | "rebase") => void;
+  mergeState: string;
+  canMergeAsAdmin: boolean;
+  adminOverride: boolean;
+  onAdminOverride: (v: boolean) => void;
   merging: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const labels: Record<string, string> = { merge: "Merge commit", squash: "Squash & merge", rebase: "Rebase" };
+  // `canMergeAsAdmin` is a permission, true even on a CLEAN PR — it must be
+  // paired with a blocked state before we offer the bypass.
+  const canOverride = canMergeAsAdmin && (mergeState === "BLOCKED" || mergeState === "BEHIND");
+  const reason = MERGE_REASON[mergeState];
   useEscapeToClose(onCancel);
   return (
     <div className="prv-overlay">
@@ -854,10 +886,17 @@ function MergeDialog({ repo, number, method, onMethod, merging, onCancel, onConf
             <div key={m} className={`method${method === m ? " sel" : ""}`} onClick={() => onMethod(m)}>{labels[m]}</div>
           ))}
         </div>
+        {reason && <div className={`mergestate ${mergeState.toLowerCase()}`}>⚠ {reason}</div>}
+        {canOverride && (
+          <label className="mergeadmin">
+            <input type="checkbox" checked={adminOverride} onChange={(e) => onAdminOverride(e.target.checked)} />
+            <span>Merge without waiting for requirements (admin override)</span>
+          </label>
+        )}
         <div className="prv-dialog-actions">
           <button className="btn-ghost" onClick={onCancel}>Cancel</button>
-          <button className="btn-merge" disabled={merging} onClick={onConfirm}>
-            {merging ? "Merging…" : `${labels[method]} #${number}`}
+          <button className={`btn-merge${adminOverride ? " override" : ""}`} disabled={merging} onClick={onConfirm}>
+            {merging ? "Merging…" : adminOverride ? `Override & ${labels[method].toLowerCase()} #${number}` : `${labels[method]} #${number}`}
           </button>
         </div>
       </div>

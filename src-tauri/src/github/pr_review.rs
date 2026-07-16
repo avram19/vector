@@ -61,6 +61,14 @@ pub struct PrDetails {
     /// Target branch the PR merges into.
     pub base_ref: String,
     pub reviewers: Vec<ReviewerStatus>,
+    /// GitHub's merge-state: "CLEAN" | "BLOCKED" | "BEHIND" | "DIRTY" |
+    /// "UNSTABLE" | "HAS_HOOKS" | "UNKNOWN". Always "UNKNOWN" for closed/merged
+    /// PRs — GitHub only computes it for open ones, so no retry is warranted.
+    pub merge_state_status: String,
+    /// Whether the viewer may bypass branch protection. This is a *permission*:
+    /// it is true even on a CLEAN PR, so it must be paired with
+    /// `merge_state_status` before offering an override.
+    pub viewer_can_merge_as_admin: bool,
 }
 
 const DETAILS_QUERY: &str = r#"query($owner: String!, $name: String!, $number: Int!) {
@@ -71,6 +79,8 @@ const DETAILS_QUERY: &str = r#"query($owner: String!, $name: String!, $number: I
       author { login }
       headRefName
       baseRefName
+      mergeStateStatus
+      viewerCanMergeAsAdmin
       latestOpinionatedReviews(last: 25) {
         nodes { author { login } state }
       }
@@ -117,6 +127,8 @@ pub fn get_pr_details(repo: &str, number: u64) -> Result<PrDetails, String> {
         head_ref: pr["headRefName"].as_str().unwrap_or_default().to_string(),
         base_ref: pr["baseRefName"].as_str().unwrap_or_default().to_string(),
         reviewers,
+        merge_state_status: pr["mergeStateStatus"].as_str().unwrap_or("UNKNOWN").to_string(),
+        viewer_can_merge_as_admin: pr["viewerCanMergeAsAdmin"].as_bool().unwrap_or(false),
     })
 }
 
@@ -474,12 +486,20 @@ pub fn submit_pr_review(review_id: &str, event: &str, body: &str) -> Result<(), 
     Ok(())
 }
 
-/// `method` must be one of "merge" | "squash" | "rebase".
-pub fn merge_pr(repo: &str, number: u64, method: &str) -> Result<(), String> {
+/// `method` must be one of "merge" | "squash" | "rebase". `admin` passes
+/// `--admin`, GitHub's branch-protection bypass. It is only meaningful when the
+/// viewer holds admin rights AND the PR is BLOCKED/BEHIND — it cannot bypass a
+/// merge conflict, so the frontend never offers it on a DIRTY PR.
+pub fn merge_pr(repo: &str, number: u64, method: &str, admin: bool) -> Result<(), String> {
     let flag = match method {
         "squash" => "--squash",
         "rebase" => "--rebase",
         _ => "--merge",
     };
-    client::run_gh(&["pr", "merge", &number.to_string(), "--repo", repo, flag]).map(|_| ())
+    let num = number.to_string();
+    let mut args: Vec<&str> = vec!["pr", "merge", &num, "--repo", repo, flag];
+    if admin {
+        args.push("--admin");
+    }
+    client::run_gh(&args).map(|_| ())
 }

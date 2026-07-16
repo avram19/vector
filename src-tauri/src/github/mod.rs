@@ -270,8 +270,8 @@ pub async fn submit_pr_review(_state: State<'_, AppState>, review_id: String, ev
 }
 
 #[tauri::command]
-pub async fn merge_pr(_state: State<'_, AppState>, repo: String, number: u64, method: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || pr_review::merge_pr(&repo, number, &method))
+pub async fn merge_pr(_state: State<'_, AppState>, repo: String, number: u64, method: String, admin: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pr_review::merge_pr(&repo, number, &method, admin))
         .await
         .map_err(|e| e.to_string())?
 }
