@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-// Sends clicks on http(s) anchors inside `ref` to the system browser.
+// Sends clicks on links inside `ref` to the system browser instead of letting
+// them navigate the app window.
 //
 // Any container rendering untrusted HTML (PR comments, markdown previews) needs
 // this: a bare <a href> inside a WKWebView navigates the app window itself, and
@@ -16,13 +17,21 @@ export function useExternalLinks(ref: React.RefObject<HTMLElement | null>) {
       const target = e.target as HTMLElement | null;
       const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!anchor) return;
-      // `anchor.href` is already absolute-resolved by the DOM. DOMPurify strips
-      // javascript: hrefs upstream; this guard is defence in depth, and also
-      // leaves mailto:/anchor links to the default handler.
-      const href = anchor.href;
-      if (!/^https?:\/\//i.test(href)) return;
+      // Decide on the *raw* attribute, not `anchor.href`: the DOM resolves a
+      // relative href against the app origin (tauri://localhost in a release
+      // build), which would slip past an http(s) test and then navigate the
+      // webview — the very bug this hook exists to prevent.
+      const raw = anchor.getAttribute("href") ?? "";
+      // In-page anchors (#section) are harmless — let the default handler run.
+      if (raw.startsWith("#")) return;
+      // Nothing else may navigate the window. An explicit external scheme opens
+      // in the system browser (DOMPurify already stripped javascript:); a
+      // relative or scheme-less href is swallowed rather than allowed to hijack
+      // the app.
       e.preventDefault();
-      invoke("open_path", { path: href }).catch(() => {});
+      if (/^(https?|mailto):/i.test(raw)) {
+        invoke("open_path", { path: raw }).catch(() => {});
+      }
     };
     root.addEventListener("click", onClick);
     return () => root.removeEventListener("click", onClick);

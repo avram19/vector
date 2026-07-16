@@ -277,7 +277,9 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
       const prs = (repoPrs ?? []).filter(inScope).filter(match);
       const authored = prs.filter((p) => p.author === login);
       const teamAll = prs.filter((p) => p.author !== login);
-      const isActioned = (p: PullRequest) => p.viewerReviewState != null;
+      // A PENDING (unsubmitted draft) review isn't an action taken — and PrRow
+      // has no chip for it — so it stays under Needs Review, not Actioned.
+      const isActioned = (p: PullRequest) => p.viewerReviewState != null && p.viewerReviewState !== "PENDING";
       return {
         action: authored.filter(needsAction),
         ready: authored.filter((p) => !needsAction(p) && readyToMerge(p)),
@@ -289,13 +291,18 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
     }
     const authored = (mine?.authored ?? []).filter(inScope).filter(match);
     const done = (mine?.recentlyClosed ?? []).filter(inScope).filter((p) => match(p) && new Date(p.updatedAt).getTime() >= weekAgo);
+    // `review-requested` and `reviewed-by` are disjoint until an author
+    // re-requests review after you've reviewed — then the PR is in both. Keep it
+    // under Needs Review (the actionable list) and drop it from Actioned.
+    const teamPrs = (team ?? []).filter(inScope).filter(match);
+    const teamUrls = new Set(teamPrs.map((p) => p.url));
     return {
       action: authored.filter(needsAction),
       ready: authored.filter((p) => !needsAction(p) && readyToMerge(p)),
       waiting: authored.filter((p) => !needsAction(p) && !readyToMerge(p)),
       done,
-      teamPrs: (team ?? []).filter(inScope).filter(match),
-      actionedPrs: (actioned ?? []).filter(inScope).filter(match),
+      teamPrs,
+      actionedPrs: (actioned ?? []).filter(inScope).filter(match).filter((p) => !teamUrls.has(p.url)),
     };
   }, [repoFilter, repoPrs, mine, team, actioned, match, login, scopeFilter]);
 
