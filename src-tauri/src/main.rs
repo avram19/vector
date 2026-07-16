@@ -845,6 +845,7 @@ fn main() {
             github::get_cached_github_my_prs,
             github::list_github_team_prs,
             github::get_cached_github_team_prs,
+            github::list_github_actioned_prs,
             github::list_github_repo_prs,
             github::list_github_workflows,
             github::list_github_runs,

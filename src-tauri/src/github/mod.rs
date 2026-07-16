@@ -124,6 +124,18 @@ pub async fn get_cached_github_team_prs(_state: State<'_, AppState>) -> Result<V
     tauri::async_runtime::spawn_blocking(prs::read_team_prs_cache).await.map_err(|e| e.to_string())
 }
 
+/// Open PRs I've already reviewed. No disk cache: the section is collapsed by
+/// default, so instant paint buys nothing.
+#[tauri::command]
+pub async fn list_github_actioned_prs(
+    _state: State<'_, AppState>,
+    after: Option<String>,
+) -> Result<prs::PrPage, String> {
+    tauri::async_runtime::spawn_blocking(move || prs::list_actioned_prs(after.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// All open PRs in one repo (any author) — used when the inbox is filtered to a
 /// specific repo, so a repo's PR-count badge always shows real PRs.
 #[tauri::command]

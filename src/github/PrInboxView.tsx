@@ -7,6 +7,7 @@ export type PullRequest = {
   repo: string; number: number; title: string; url: string;
   author: string; authorAvatar: string | null; headRef: string;
   isDraft: boolean; state: string; reviewDecision: string | null;
+  viewerReviewState: string | null;
   mergeable: string; ciStatus: string | null; updatedAt: string;
 };
 type MyPrs = { authored: PullRequest[]; recentlyClosed: PullRequest[] };
@@ -62,6 +63,10 @@ function PrRow({ pr, onTrigger, unreadSet, onOpenPrReview }: {
     if (pr.reviewDecision === "CHANGES_REQUESTED") chips.push({ label: "changes requested", cls: "req" });
     if (pr.reviewDecision === "APPROVED") chips.push({ label: "approved", cls: "ok" });
     if (pr.isDraft) chips.push({ label: "draft", cls: "draft" });
+    if (pr.viewerReviewState === "APPROVED") chips.push({ label: "you approved", cls: "ok" });
+    if (pr.viewerReviewState === "CHANGES_REQUESTED") chips.push({ label: "you requested changes", cls: "req" });
+    if (pr.viewerReviewState === "COMMENTED") chips.push({ label: "you commented", cls: "mine" });
+    if (pr.viewerReviewState === "DISMISSED") chips.push({ label: "your review dismissed", cls: "draft" });
   }
   return (
     <div className="gh-pr-row" onClick={() => onOpenPrReview(pr.repo, pr.number)} title={pr.title}>
@@ -128,6 +133,9 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
   const [team, setTeam] = useState<PullRequest[] | null>(null);
   const [teamCursor, setTeamCursor] = useState<string | null>(null);
   const [teamMore, setTeamMore] = useState(false);
+  const [actioned, setActioned] = useState<PullRequest[] | null>(null);
+  const [actionedCursor, setActionedCursor] = useState<string | null>(null);
+  const [actionedMore, setActionedMore] = useState(false);
   const [repoPrs, setRepoPrs] = useState<PullRequest[] | null>(null);
   const [repoCursor, setRepoCursor] = useState<string | null>(null);
   const [repoMore, setRepoMore] = useState(false);
@@ -147,7 +155,10 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
     const p2 = invoke<PrPage>("list_github_team_prs", { after: null })
       .then((page) => { setTeam(page.prs); setTeamCursor(page.nextCursor); })
       .catch((e) => setError(String(e)));
-    Promise.allSettled([p1, p2]).finally(() => setRefreshing(false));
+    const p3 = invoke<PrPage>("list_github_actioned_prs", { after: null })
+      .then((page) => { setActioned(page.prs); setActionedCursor(page.nextCursor); })
+      .catch((e) => setError(String(e)));
+    Promise.allSettled([p1, p2, p3]).finally(() => setRefreshing(false));
   }, []);
 
   useEffect(() => {
@@ -196,6 +207,15 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
       .then((page) => { setTeam((prev) => [...(prev ?? []), ...page.prs]); setTeamCursor(page.nextCursor); })
       .catch((e) => setError(String(e)))
       .finally(() => setTeamMore(false));
+  };
+
+  const loadMoreActioned = () => {
+    if (!actionedCursor || actionedMore) return;
+    setActionedMore(true);
+    invoke<PrPage>("list_github_actioned_prs", { after: actionedCursor })
+      .then((page) => { setActioned((prev) => [...(prev ?? []), ...page.prs]); setActionedCursor(page.nextCursor); })
+      .catch((e) => setError(String(e)))
+      .finally(() => setActionedMore(false));
   };
 
   // All repos that have open PRs (from the repos cache) — the dropdown source,
@@ -256,13 +276,15 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
       // Repo mode: all open PRs in the repo, split by authorship.
       const prs = (repoPrs ?? []).filter(inScope).filter(match);
       const authored = prs.filter((p) => p.author === login);
-      const teamPrs = prs.filter((p) => p.author !== login);
+      const teamAll = prs.filter((p) => p.author !== login);
+      const isActioned = (p: PullRequest) => p.viewerReviewState != null;
       return {
         action: authored.filter(needsAction),
         ready: authored.filter((p) => !needsAction(p) && readyToMerge(p)),
         waiting: authored.filter((p) => !needsAction(p) && !readyToMerge(p)),
         done: [] as PullRequest[],
-        teamPrs,
+        teamPrs: teamAll.filter((p) => !isActioned(p)),
+        actionedPrs: teamAll.filter(isActioned),
       };
     }
     const authored = (mine?.authored ?? []).filter(inScope).filter(match);
@@ -273,11 +295,12 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
       waiting: authored.filter((p) => !needsAction(p) && !readyToMerge(p)),
       done,
       teamPrs: (team ?? []).filter(inScope).filter(match),
+      actionedPrs: (actioned ?? []).filter(inScope).filter(match),
     };
-  }, [repoFilter, repoPrs, mine, team, match, login, scopeFilter]);
+  }, [repoFilter, repoPrs, mine, team, actioned, match, login, scopeFilter]);
 
   const myTotal = groups.action.length + groups.ready.length + groups.waiting.length + groups.done.length;
-  const nothingLoaded = !mine && !team && !repoPrs;
+  const nothingLoaded = !mine && !team && !repoPrs && !actioned;
   // Repo mode: loading whenever its on-demand fetch hasn't returned yet (even if
   // the inbox was already loaded). Inbox mode: only before the first results.
   const showLoading = repoFilter ? (repoLoading && !repoPrs) : (loading && !mine && !team);
@@ -330,9 +353,17 @@ export function PrInboxView({ repoFilter, onRepoFilter, login, onTrigger, notifi
               {groups.done.length > 0 && <Section title="Done" count={groups.done.length} level={1} defaultOpen={false}>{groups.done.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />)}</Section>}
               {myTotal === 0 && <div className="gh-placeholder">Nothing here. 🎉</div>}
             </Section>
-            <Section title="Team Pull Requests" count={groups.teamPrs.length} level={0}>
-              {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />) : <div className="gh-placeholder">No pull requests.</div>}
-              {!repoFilter && teamCursor && <ViewMore loading={teamMore} onClick={loadMoreTeam} />}
+            <Section title="Team Pull Requests" count={groups.teamPrs.length + groups.actionedPrs.length} level={0}>
+              <Section title="Needs Review" count={groups.teamPrs.length} level={1}>
+                {groups.teamPrs.length > 0 ? groups.teamPrs.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />) : <div className="gh-placeholder">No pull requests.</div>}
+                {!repoFilter && teamCursor && <ViewMore loading={teamMore} onClick={loadMoreTeam} />}
+              </Section>
+              {groups.actionedPrs.length > 0 && (
+                <Section title="Actioned" count={groups.actionedPrs.length} level={1} defaultOpen={false}>
+                  {groups.actionedPrs.map((p) => <PrRow key={p.url} pr={p} onTrigger={onTrigger} unreadSet={unreadSet} onOpenPrReview={onOpenPrReview} />)}
+                  {!repoFilter && actionedCursor && <ViewMore loading={actionedMore} onClick={loadMoreActioned} />}
+                </Section>
+              )}
             </Section>
             {repoFilter && repoCursor && <ViewMore loading={repoMore} onClick={loadMoreRepo} />}
           </>

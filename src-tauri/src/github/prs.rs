@@ -15,6 +15,17 @@ pub struct PullRequest {
     pub is_draft: bool,
     pub state: String,
     pub review_decision: Option<String>,
+    /// The viewer's own latest review: "APPROVED" | "CHANGES_REQUESTED" |
+    /// "COMMENTED" | "DISMISSED" | "PENDING", or None if they haven't reviewed.
+    /// Distinct from `review_decision`, which is the PR's overall decision
+    /// across all reviewers.
+    ///
+    /// `default` matters: `PullRequest` round-trips through the on-disk SWR
+    /// cache, and a `team-prs.json` written by v0.3.9 has no such key. Without
+    /// it, an upgrading user's cached team list fails to parse and paints empty
+    /// until the network refetch lands.
+    #[serde(default)]
+    pub viewer_review_state: Option<String>,
     pub mergeable: String,
     pub ci_status: Option<String>,
     pub updated_at: String,
@@ -40,6 +51,7 @@ const PR_FRAGMENT: &str = r#"fragment prFields on PullRequest {
   number title url isDraft state headRefName reviewDecision mergeable updatedAt
   repository { nameWithOwner }
   author { login avatarUrl }
+  viewerLatestReview { state }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }"#;
 
@@ -67,6 +79,7 @@ fn parse_pr(n: &serde_json::Value) -> PullRequest {
         is_draft: n["isDraft"].as_bool().unwrap_or(false),
         state: n["state"].as_str().unwrap_or_default().to_string(),
         review_decision: n["reviewDecision"].as_str().map(|s| s.to_string()),
+        viewer_review_state: n["viewerLatestReview"]["state"].as_str().map(|s| s.to_string()),
         mergeable: n["mergeable"].as_str().unwrap_or("UNKNOWN").to_string(),
         ci_status: n["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["state"]
             .as_str()
@@ -125,6 +138,21 @@ pub fn list_my_prs() -> Result<MyPrs, String> {
 pub fn list_team_prs(after: Option<&str>) -> Result<PrPage, String> {
     let v = run_search(&format!("{PR_FRAGMENT}\n{TEAM_BODY}"), after)?;
     Ok(collect_page(&v, "review"))
+}
+
+const ACTIONED_BODY: &str = r#"query($endCursor: String) {
+  reviewed: search(query: "is:pr is:open reviewed-by:@me -author:@me sort:updated-desc", type: ISSUE, first: 50, after: $endCursor) {
+    nodes { ...prFields }
+    pageInfo { hasNextPage endCursor }
+  }
+}"#;
+
+/// One page of open PRs I've already reviewed (excluding my own). GitHub drops a
+/// PR from `review-requested:@me` the moment you review it, so these are
+/// invisible to the Team PRs query — this is a separate search, not a filter.
+pub fn list_actioned_prs(after: Option<&str>) -> Result<PrPage, String> {
+    let v = run_search(&format!("{PR_FRAGMENT}\n{ACTIONED_BODY}"), after)?;
+    Ok(collect_page(&v, "reviewed"))
 }
 
 /// One page of all open PRs in a specific repo (regardless of author/reviewer),
