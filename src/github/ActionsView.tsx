@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RepoFilterDropdown } from "./RepoFilterDropdown";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 export type Workflow = { id: number; name: string; path: string; state: string };
 export type Step = { name: string; status: string; conclusion: string | null; number: number };
@@ -172,6 +173,11 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                 <span className="gh-fav-repo">{r.repo}</span>
                 <span className="gh-fav-wf">{r.workflowName}</span>
               </div>
+              <CopyLinkButton
+                url={`https://github.com/${r.repo}/actions/runs/${r.id}`}
+                title="Copy run link"
+                className="gh-icobtn"
+              />
               <button className="gh-job-log" onClick={() => openRunLog(r)}>Logs</button>
             </div>
             <div className="gh-fav-run" onClick={() => toggleFavRun(r)}>
@@ -225,6 +231,11 @@ export function ActionsView({ favorites, onFavorites, onOpenPreview, repo, onRep
                     <div className="gh-run-l2"><span className="gh-run-branch">{run.branch}</span> · {run.event} · {run.actor} · {relTime(run.createdAt)}</div>
                   </div>
                   <span className="gh-run-actions" onClick={(e) => e.stopPropagation()}>
+                    <CopyLinkButton
+                      url={`https://github.com/${run.repo}/actions/runs/${run.id}`}
+                      title="Copy run link"
+                      className="gh-icobtn"
+                    />
                     {run.status !== "completed"
                       ? <button className="gh-job-log" onClick={() => cancel(run)}>Cancel</button>
                       : <>

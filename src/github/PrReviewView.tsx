@@ -7,6 +7,7 @@ import DOMPurify from "dompurify";
 import { parseDiff, DiffLine } from "../preview/DiffRenderer";
 import { GithubIcon } from "../sidebar/Sidebar";
 import { useEscapeToClose } from "../useEscapeToClose";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 // Same relative-time convention used across the other GitHub views
 // (PrInboxView, ActionsView) — human-readable instead of a raw ISO string.
@@ -632,6 +633,11 @@ export function PrReviewView({ repo, number, standalone, active = true, onCloseT
             <MessageIcon />
             {prComments.length > 0 && <span className="prv-badge">{prComments.length > 99 ? "99+" : prComments.length}</span>}
           </button>
+          <CopyLinkButton
+            url={`https://github.com/${repo}/pull/${number}`}
+            title="Copy PR link"
+            className="prv-icobtn"
+          />
           <button
             type="button"
             className="prv-icobtn"
