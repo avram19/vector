@@ -93,3 +93,7 @@ pub fn extra_path_dirs(home: &Path) -> Vec<PathBuf> {
         home.join(".bun/bin"),
     ]
 }
+
+pub fn read_claude_credential(profile_id: Option<&str>) -> Option<String> {
+    crate::usage::read_oauth_token_keychain(profile_id)
+}

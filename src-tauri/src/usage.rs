@@ -74,7 +74,8 @@ fn keychain_service_for_profile(profile_id: Option<&str>) -> Option<String> {
     }
 }
 
-fn read_oauth_token(profile_id: Option<&str>) -> Option<String> {
+#[cfg(target_os = "macos")]
+pub(crate) fn read_oauth_token_keychain(profile_id: Option<&str>) -> Option<String> {
     // `security find-generic-password -s "<service>" -w` returns the password
     // (the JSON blob) on stdout. We parse out accessToken.
     let service = keychain_service_for_profile(profile_id)?;
@@ -92,7 +93,7 @@ fn read_oauth_token(profile_id: Option<&str>) -> Option<String> {
 }
 
 pub async fn fetch_claude_usage(profile_id: Option<&str>) -> Result<Option<ClaudeUsage>, String> {
-    let token = match read_oauth_token(profile_id) { Some(t) => t, None => return Ok(None) };
+    let token = match crate::platform::read_claude_credential(profile_id) { Some(t) => t, None => return Ok(None) };
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
         .build()

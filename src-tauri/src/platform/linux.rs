@@ -78,3 +78,14 @@ pub fn extra_path_dirs(home: &Path) -> Vec<PathBuf> {
         home.join(".bun/bin"),
     ]
 }
+
+/// On Linux, Claude Code stores credentials as plaintext `.credentials.json`
+/// inside the profile config dir (or `~/.claude`). No keychain.
+pub fn read_claude_credential(profile_id: Option<&str>) -> Option<String> {
+    let dir = match profile_id {
+        None | Some("") | Some("__default__") => dirs::home_dir()?.join(".claude"),
+        Some(id) => crate::config::profile_config_dir(id)?,
+    };
+    let raw = std::fs::read_to_string(dir.join(".credentials.json")).ok()?;
+    super::creds::extract_access_token(&raw)
+}

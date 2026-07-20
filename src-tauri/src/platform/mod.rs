@@ -3,6 +3,7 @@
 //! impl is a build error rather than a silent parity gap.
 
 mod uri_list;
+mod creds;
 
 #[cfg(target_os = "macos")]
 mod macos;
