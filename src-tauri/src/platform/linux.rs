@@ -34,6 +34,12 @@ pub fn open_default_app(path: &Path) -> Result<(), String> {
     Command::new("xdg-open").arg(path).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
+pub fn process_cwd(pid: u32) -> Option<String> {
+    std::fs::read_link(format!("/proc/{pid}/cwd"))
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
 pub fn extra_path_dirs(home: &Path) -> Vec<PathBuf> {
     vec![
         PathBuf::from("/usr/local/bin"),

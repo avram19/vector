@@ -6,3 +6,4 @@ pub fn open_path(target: &str) -> std::io::Result<()> {
 pub fn reveal_in_file_manager(_path: &Path) -> Result<(), String> { todo!("Milestone 2: explorer /select") }
 pub fn open_default_app(_path: &Path) -> Result<(), String> { todo!("Milestone 2: ShellExecute") }
 pub fn extra_path_dirs(_home: &Path) -> Vec<PathBuf> { todo!("Milestone 2: %APPDATA%\\npm, scoop, etc.") }
+pub fn process_cwd(_pid: u32) -> Option<String> { todo!("Milestone 2: NtQueryInformationProcess PEB walk") }
