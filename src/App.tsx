@@ -27,6 +27,7 @@ import { PrReviewView } from "./github/PrReviewView";
 import { useEscapeToClose } from "./useEscapeToClose";
 import { makeCwdSniffer } from "./shell/cwdSniffer";
 import { makeAutocompleteAddon } from "./shell/autocompleteAddon";
+import { isMod, isMac } from "./platform";
 
 // Compare two `X.Y.Z` version strings. Returns negative if a<b, 0 if equal, positive if a>b.
 // Non-numeric chunks (pre-release tags like `-beta.1`) are ignored — we only ship stable releases.
@@ -1260,13 +1261,17 @@ export default function App() {
         setActiveId(tabs[nextIdx].id);
         return;
       }
-      if (!e.metaKey) return;
-      if (e.key === "," && !e.shiftKey && !e.altKey && !e.ctrlKey) {
+      if (!isMod(e)) return;
+      // isMod() already pins down the platform's mod chord (Cmd alone on
+      // macOS; Ctrl+Shift elsewhere), so these "no stray modifiers" guards
+      // only need to reject an extra Alt — and, on macOS only, reject the
+      // Ctrl/Shift that would otherwise collide with the mac-only chord.
+      if (e.key === "," && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
         e.preventDefault();
         setSettingsOpen((o) => !o);
         return;
       }
-      if (e.key === "k" && !e.shiftKey && !e.altKey && !e.ctrlKey) {
+      if (e.key === "k" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
         e.preventDefault();
         setSwitcherOpen((o) => !o);
         return;
@@ -1286,15 +1291,18 @@ export default function App() {
         setFontSize(13);
         return;
       }
-      if (e.key === "t" && !e.shiftKey) { e.preventDefault(); openPickerForNewTab(); }
-      else if (e.key === "w" && !e.shiftKey) {
+      if (e.key === "t" && (!isMac || !e.shiftKey)) { e.preventDefault(); openPickerForNewTab(); }
+      else if (e.key === "w" && (!isMac || !e.shiftKey)) {
         e.preventDefault();
         const tab = tabs.find((t) => t.id === activeId);
         if (tab) closePane(tab.id, tab.activePaneId);
       }
       else if ((e.key === "d" || e.key === "D")) {
         e.preventDefault();
-        splitActivePane(e.shiftKey ? "column" : "row");
+        // Shift picks the split orientation on macOS (Cmd vs Cmd+Shift+D).
+        // Shift is already consumed by isMod()'s Ctrl+Shift chord elsewhere,
+        // so Alt is the orientation toggle there instead (Ctrl+Shift+Alt+D).
+        splitActivePane((isMac ? e.shiftKey : e.altKey) ? "column" : "row");
       }
       else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
@@ -3966,12 +3974,15 @@ function TerminalView({
       if (e.key === "`" && e.ctrlKey && !e.metaKey && !e.altKey) return false;
       if (e.key === "Enter" && e.shiftKey) return false;
       // Let our document-capture handler own Cmd/Opt+Backspace.
-      if (e.key === "Backspace" && (e.metaKey || e.altKey)) return false;
+      // Cmd+Backspace is a macOS-only readline shim; Opt+Backspace works the
+      // same on every platform.
+      if (e.key === "Backspace" && ((isMac && e.metaKey) || e.altKey)) return false;
       // Cmd+Arrow and Opt+Arrow are translated to readline sequences below.
       // (Cmd+Opt+Arrow stays with the global handler for pane focus.)
+      // Cmd+Arrow is macOS-only; Opt+Arrow works the same on every platform.
       if ((e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")
           && !e.shiftKey && !e.ctrlKey
-          && ((e.metaKey && !e.altKey) || (e.altKey && !e.metaKey))) {
+          && ((isMac && e.metaKey && !e.altKey) || (e.altKey && !e.metaKey))) {
         return false;
       }
       return true;
@@ -4001,8 +4012,9 @@ function TerminalView({
         // Shift+Enter → ESC+CR (Claude Code's /terminal-setup multi-line).
         return send("\x1b\r");
       }
-      if (e.key === "Backspace" && e.metaKey && !e.ctrlKey) {
-        // Cmd+Backspace → kill line backwards (Ctrl+U).
+      if (isMac && e.key === "Backspace" && e.metaKey && !e.ctrlKey) {
+        // Cmd+Backspace → kill line backwards (Ctrl+U). macOS only — Linux/
+        // Windows have no Cmd key and native Ctrl+U already does this.
         return send("\x15");
       }
       if (e.key === "Backspace" && e.altKey && !e.metaKey && !e.ctrlKey) {
@@ -4011,7 +4023,9 @@ function TerminalView({
       }
       // macOS line-editing shortcuts — translate to readline control chars
       // so Claude Code's input (and any bash-like prompt) obeys them.
-      if (e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+      // macOS only — Linux/Windows have no Cmd key, and Ctrl+A/E there
+      // belong to the shell's own readline bindings.
+      if (isMac && e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey) {
         if (e.key === "ArrowLeft")  return send("\x01"); // Cmd+← → Ctrl+A (line start)
         if (e.key === "ArrowRight") return send("\x05"); // Cmd+→ → Ctrl+E (line end)
         if (e.key === "ArrowUp")    return send("\x01"); // Cmd+↑ → line start (doc-start analog)

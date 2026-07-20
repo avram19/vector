@@ -754,6 +754,7 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_os::init())
         .manage(AppState {
             registry: Arc::new(pty::PtyRegistry::new()),
             config: parking_lot::Mutex::new(config::load()),

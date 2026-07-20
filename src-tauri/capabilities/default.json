@@ -11,6 +11,7 @@
     "dialog:default",
     "updater:default",
     "process:default",
-    "autostart:default"
+    "autostart:default",
+    "os:default"
   ]
 }
