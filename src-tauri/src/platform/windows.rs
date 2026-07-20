@@ -1,0 +1,8 @@
+use std::path::{Path, PathBuf};
+
+pub fn open_path(target: &str) -> std::io::Result<()> {
+    std::process::Command::new("cmd").args(["/C", "start", "", target]).spawn().map(|_| ())
+}
+pub fn reveal_in_file_manager(_path: &Path) -> Result<(), String> { todo!("Milestone 2: explorer /select") }
+pub fn open_default_app(_path: &Path) -> Result<(), String> { todo!("Milestone 2: ShellExecute") }
+pub fn extra_path_dirs(_home: &Path) -> Vec<PathBuf> { todo!("Milestone 2: %APPDATA%\\npm, scoop, etc.") }

@@ -5,6 +5,7 @@ mod config;
 mod fs_watch;
 mod git;
 mod github;
+mod platform;
 mod preview;
 mod pty;
 mod sessions;
@@ -698,14 +699,7 @@ async fn open_path(path: String) -> Result<(), String> {
         path
     };
 
-    #[cfg(target_os = "macos")]
-    let spawn = std::process::Command::new("/usr/bin/open").arg(&target).spawn();
-    #[cfg(target_os = "linux")]
-    let spawn = std::process::Command::new("xdg-open").arg(&target).spawn();
-    #[cfg(target_os = "windows")]
-    let spawn = std::process::Command::new("cmd").args(["/C", "start", "", &target]).spawn();
-
-    spawn.map(|_| ()).map_err(|e| e.to_string())
+    platform::open_path(&target).map_err(|e| e.to_string())
 }
 
 /// Spawn (or focus, if already open) a standalone OS window containing only
