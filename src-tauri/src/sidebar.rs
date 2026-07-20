@@ -36,8 +36,9 @@ pub struct EditorInfo {
     pub display_name: String,
 }
 
-// ─── Hardcoded editor list ────────────────────────────────────────────────────
+// ─── Hardcoded editor list (macOS bundle IDs; Linux uses LINUX_EDITORS) ──────
 
+#[cfg(target_os = "macos")]
 const EDITORS: &[(&str, &str)] = &[
     ("com.microsoft.VSCode", "Visual Studio Code"),
     ("com.todesktop.230313mzl4w4u92", "Cursor"),

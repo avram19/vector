@@ -1262,47 +1262,52 @@ export default function App() {
         return;
       }
       if (!isMod(e)) return;
-      // isMod() already pins down the platform's mod chord (Cmd alone on
-      // macOS; Ctrl+Shift elsewhere), so these "no stray modifiers" guards
-      // only need to reject an extra Alt — and, on macOS only, reject the
-      // Ctrl/Shift that would otherwise collide with the mac-only chord.
-      if (e.key === "," && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
+      // Match on e.code (physical key), not e.key: under the Linux/Windows
+      // Ctrl+Shift chord, Shift mutates e.key ("t"→"T", ","→"<", "1"→"!"), so
+      // e.key equality silently misses. e.code ("KeyT","Comma","Digit1") is
+      // Shift-independent and identical on macOS. The macOS-only guards below
+      // still gate on modifier STATE (reject stray Alt, and on macOS the
+      // Ctrl/Shift that would collide with the mac-only Cmd chord).
+      if (e.code === "Comma" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
         e.preventDefault();
         setSettingsOpen((o) => !o);
         return;
       }
-      if (e.key === "k" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
+      if (e.code === "KeyK" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
         e.preventDefault();
         setSwitcherOpen((o) => !o);
         return;
       }
-      if (e.key === "=" || e.key === "+") {
+      if (e.code === "Equal") {
         e.preventDefault();
         setFontSize((s) => clamp(s + 1, 8, 40));
         return;
       }
-      if (e.key === "-" || e.key === "_") {
+      if (e.code === "Minus") {
         e.preventDefault();
         setFontSize((s) => clamp(s - 1, 8, 40));
         return;
       }
-      if (e.key === "0") {
+      if (e.code === "Digit0") {
         e.preventDefault();
         setFontSize(13);
         return;
       }
-      if (e.key === "t" && (!isMac || !e.shiftKey)) { e.preventDefault(); openPickerForNewTab(); }
-      else if (e.key === "w" && (!isMac || !e.shiftKey)) {
+      if (e.code === "KeyT" && (!isMac || !e.shiftKey)) { e.preventDefault(); openPickerForNewTab(); }
+      else if (e.code === "KeyW" && (!isMac || !e.shiftKey)) {
         e.preventDefault();
         const tab = tabs.find((t) => t.id === activeId);
         if (tab) closePane(tab.id, tab.activePaneId);
       }
-      else if ((e.key === "d" || e.key === "D")) {
+      else if (e.code === "KeyD") {
         e.preventDefault();
-        // Shift picks the split orientation on macOS (Cmd vs Cmd+Shift+D).
-        // Shift is already consumed by isMod()'s Ctrl+Shift chord elsewhere,
-        // so Alt is the orientation toggle there instead (Ctrl+Shift+Alt+D).
-        splitActivePane((isMac ? e.shiftKey : e.altKey) ? "column" : "row");
+        // Split orientation. macOS: Cmd+D = row, Cmd+Shift+D = column.
+        // Linux/Win: Ctrl+Shift+D = row, Ctrl+Shift+E = column (KeyE below).
+        splitActivePane(isMac && e.shiftKey ? "column" : "row");
+      }
+      else if (!isMac && e.code === "KeyE") {
+        e.preventDefault();
+        splitActivePane("column");
       }
       else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
@@ -1311,12 +1316,12 @@ export default function App() {
         const next = findAdjacentPane(tab.root, tab.activePaneId, e.key);
         if (next) setActivePane(tab.id, next);
       }
-      else if (e.key === "r" || e.key === "R") {
+      else if (e.code === "KeyR") {
         e.preventDefault();
         if (e.shiftKey) reloadActive();
       }
-      else if (/^[1-9]$/.test(e.key)) {
-        const idx = parseInt(e.key, 10) - 1;
+      else if (/^Digit[1-9]$/.test(e.code)) {
+        const idx = parseInt(e.code.slice(5), 10) - 1;
         if (tabs[idx]) { e.preventDefault(); setActiveId(tabs[idx].id); }
       }
     };
@@ -3985,6 +3990,35 @@ function TerminalView({
           && ((isMac && e.metaKey && !e.altKey) || (e.altKey && !e.metaKey))) {
         return false;
       }
+      // Linux/Windows terminal copy/paste (macOS uses the Edit menu + Cmd+C/V).
+      // Plain Ctrl+C/V stay with the shell (SIGINT / literal); the copy/paste
+      // chord is Ctrl+Shift+C / Ctrl+Shift+V, the terminal convention.
+      if (!isMac && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+        if (e.code === "KeyC") {
+          const sel = term.getSelection();
+          if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+          e.preventDefault();
+          return false; // swallow so it never sends ETX to the shell
+        }
+        if (e.code === "KeyV") {
+          e.preventDefault();
+          void (async () => {
+            // Mirror the mouse-paste path: a copied file inserts its path, else text.
+            try {
+              const paths = (await invoke<string[]>("read_clipboard_file_paths")).filter((p) => !IMAGE_EXT.test(p));
+              if (paths.length > 0) {
+                invoke("write_stdin", { sessionId, data: pathsToStdin(paths) }).catch(() => {});
+                return;
+              }
+            } catch {}
+            try {
+              const text = await navigator.clipboard.readText();
+              if (text) invoke("write_stdin", { sessionId, data: text }).catch(() => {});
+            } catch {}
+          })();
+          return false;
+        }
+      }
       return true;
     });
     // Gate ghost-text autocomplete on standalone shell-agent panes only.
@@ -4259,7 +4293,7 @@ function TerminalContextMenu({ menu, onClose }: { menu: TermMenuData; onClose: (
     });
     if (menu.linkKind === "path") {
       items.push({
-        label: "Reveal in Finder",
+        label: isMac ? "Reveal in Finder" : "Show in Files",
         onClick: () => { invoke("reveal_in_finder", { path: menu.uri }).catch(() => {}); onClose(); },
       });
     }
