@@ -145,8 +145,12 @@ work. The work is filling the platform module and solving the clipboard.
 - **`scripts/release.sh`** generalized (or split per-OS) — today it hardcodes
   `.dmg`, `aarch64`, `Vector.app.tar.gz`, and macOS notarization.
 - **`latest.json`** gains per-platform keys: `darwin-aarch64` (existing),
-  `linux-x86_64` (AppImage), `windows-x86_64` (NSIS). The Tauri updater reads the
-  matching key per client.
+  `linux-x86_64` + `linux-aarch64` (AppImage), `windows-x86_64` (NSIS). The Tauri
+  updater reads the matching key per client.
+- **Linux builds both arches:** `x86_64` (the primary distributed target) **and
+  `aarch64`**. The aarch64 artifact exists so it runs natively in the developer's
+  Apple-Silicon UTM VM (no slow x86_64 emulation in the verification loop). Built
+  on an arm64 runner (or cross-built) alongside x86_64.
 - **GitHub Actions 3-OS matrix** (`macos-latest`, `ubuntu-latest`,
   `windows-latest`) builds + signs (updater key) + uploads artifacts. Interactive
   parity verification is manual in local VMs before promoting a release.
@@ -155,9 +159,15 @@ work. The work is filling the platform module and solving the clipboard.
 
 ## Testing / verification
 
-No unit-test suite exists. Verification is behavioral, per CLAUDE.md:
+No unit-test suite exists. Verification is behavioral, per CLAUDE.md.
 
-- **Build:** CI matrix must produce installable artifacts on all three runners.
+**Verification environment (Linux):** **UTM** (free) running **Ubuntu Desktop
+arm64**. The **aarch64 Linux artifact** runs natively there — full-speed, no
+emulation — which is the whole reason aarch64 is in the build matrix. VMware
+Fusion (free for personal use) is an equivalent alternative.
+
+- **Build:** CI matrix must produce installable artifacts on all runners
+  (Linux: both x86_64 and aarch64).
 - **Linux VM:** exercise PTY streaming (Claude session), live cwd tracking (zsh +
   bash), clipboard file paste, reveal-in-files, editor open, usage meter, GitHub
   sidebar, updater. Confirm xterm renders cleanly on WebKitGTK.
