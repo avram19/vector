@@ -7,17 +7,17 @@
 //! of the drag-and-drop file-path insertion.
 
 /// Absolute paths of any files currently on the clipboard. Empty when the
-/// clipboard holds no files (e.g. plain text) or on non-macOS platforms.
+/// clipboard holds no files (e.g. plain text). Delegates to
+/// `platform::clipboard_file_paths` for the OS-specific read (NSPasteboard on
+/// macOS, `text/uri-list` via wl-paste/xclip/xsel on Linux).
 #[tauri::command]
 pub fn read_clipboard_file_paths() -> Vec<String> {
-    #[cfg(target_os = "macos")]
-    {
-        macos::file_paths()
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        Vec::new()
-    }
+    crate::platform::clipboard_file_paths()
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn macos_file_paths() -> Vec<String> {
+    macos::file_paths()
 }
 
 #[cfg(target_os = "macos")]

@@ -2,6 +2,8 @@
 //! the same surface; the compiler enforces completeness, so a missing platform
 //! impl is a build error rather than a silent parity gap.
 
+mod uri_list;
+
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]

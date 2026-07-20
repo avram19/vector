@@ -76,6 +76,11 @@ pub fn process_cwd(pid: u32) -> Option<String> {
     cstr.to_str().ok().map(|s| s.to_string())
 }
 
+pub fn clipboard_file_paths() -> Vec<String> {
+    // Existing NSPasteboard reader lives in crate::clipboard::macos.
+    crate::clipboard::macos_file_paths()
+}
+
 pub fn extra_path_dirs(home: &Path) -> Vec<PathBuf> {
     vec![
         PathBuf::from("/opt/homebrew/bin"),

@@ -40,6 +40,33 @@ pub fn process_cwd(pid: u32) -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
+/// Read file paths off the clipboard via the freedesktop `text/uri-list`
+/// type. Tries Wayland's `wl-paste` first, then the X11 tools `xclip`/`xsel`.
+/// Never spawns by bare name — resolves each binary through `which_path`
+/// since GUI-launched processes get a minimal `PATH`.
+pub fn clipboard_file_paths() -> Vec<String> {
+    use crate::config::which_path;
+    // Wayland first, then X11. Request the file URI list explicitly.
+    let attempts: [(&str, Vec<&str>); 3] = [
+        ("wl-paste", vec!["--no-newline", "--type", "text/uri-list"]),
+        ("xclip", vec!["-selection", "clipboard", "-t", "text/uri-list", "-o"]),
+        ("xsel", vec!["--clipboard", "--output"]),
+    ];
+    for (bin, args) in attempts {
+        let Some(path) = which_path(bin) else { continue };
+        if let Ok(out) = Command::new(path).args(&args).output() {
+            if out.status.success() {
+                let text = String::from_utf8_lossy(&out.stdout);
+                let paths = super::uri_list::parse_uri_list(&text);
+                if !paths.is_empty() {
+                    return paths;
+                }
+            }
+        }
+    }
+    Vec::new()
+}
+
 pub fn extra_path_dirs(home: &Path) -> Vec<PathBuf> {
     vec![
         PathBuf::from("/usr/local/bin"),
