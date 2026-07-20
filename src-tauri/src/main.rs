@@ -64,6 +64,8 @@ async fn default_agent(state: State<'_, AppState>) -> Result<String, String> {
 fn default_shell() -> Vec<String> {
     if cfg!(windows) {
         vec!["powershell.exe".into()]
+    } else if cfg!(target_os = "linux") {
+        vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into())]
     } else {
         vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into())]
     }
@@ -270,6 +272,18 @@ _vector_osc7
 
         env.push(("ZDOTDIR".into(), zdotdir.to_string_lossy().to_string()));
         env.push(("VECTOR_USER_ZDOTDIR".into(), user_zdotdir));
+    }
+    // bash: PROMPT_COMMAND is read from the environment, so we can inject OSC-7
+    // without a temp rcfile. Prepend so the user's own PROMPT_COMMAND still runs.
+    else if shell.ends_with("/bash") || shell == "bash" {
+        let existing = std::env::var("PROMPT_COMMAND").unwrap_or_default();
+        let osc7 = r#"printf '\033]7;file://%s%s\007' "$HOSTNAME" "$PWD""#;
+        let combined = if existing.is_empty() {
+            osc7.to_string()
+        } else {
+            format!("{osc7}; {existing}")
+        };
+        env.push(("PROMPT_COMMAND".into(), combined));
     }
 
     let cwd_path = cwd
