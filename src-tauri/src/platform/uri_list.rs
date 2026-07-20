@@ -26,7 +26,7 @@ pub(crate) fn percent_decode(s: &str) -> String {
     let mut i = 0;
     while i < b.len() {
         if b[i] == b'%' && i + 2 < b.len() {
-            if let Ok(byte) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+            if let Some(byte) = s.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok()) {
                 out.push(byte);
                 i += 3;
                 continue;
@@ -40,7 +40,7 @@ pub(crate) fn percent_decode(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_uri_list;
+    use super::{parse_uri_list, percent_decode};
     #[test]
     fn parses_and_percent_decodes_file_uris() {
         let input = "file:///home/u/a%20b.txt\r\nfile:///tmp/c.rs\r\n# comment\r\n";
@@ -53,5 +53,11 @@ mod tests {
     fn ignores_non_file_and_blank_lines() {
         let input = "\r\nhttp://x/y\r\nfile:///z\r\n";
         assert_eq!(parse_uri_list(input), vec!["/z".to_string()]);
+    }
+    #[test]
+    fn does_not_panic_on_percent_before_multibyte() {
+        // A literal '%' before a multi-byte char must not panic; it falls
+        // through and is preserved rather than decoded.
+        assert_eq!(percent_decode("%aé"), "%aé".to_string());
     }
 }
