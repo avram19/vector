@@ -240,6 +240,7 @@ pub async fn installed_editors(state: State<'_, AppState>) -> Result<Vec<EditorI
     // Slow path: probe each editor in parallel on a blocking worker. Eight
     // sequential `mdfind` calls would otherwise stall the main thread for
     // hundreds of ms on first sidebar mount.
+    #[cfg(target_os = "macos")]
     let found = tauri::async_runtime::spawn_blocking(|| -> Vec<EditorInfo> {
         let Some(mdfind) = config::which_path("mdfind") else {
             return vec![];
@@ -275,20 +276,56 @@ pub async fn installed_editors(state: State<'_, AppState>) -> Result<Vec<EditorI
     .await
     .map_err(|e| e.to_string())?;
 
+    #[cfg(target_os = "linux")]
+    let found = tauri::async_runtime::spawn_blocking(|| -> Vec<EditorInfo> {
+        // (binary_name, display_name) — probed against the augmented PATH.
+        const LINUX_EDITORS: &[(&str, &str)] = &[
+            ("code", "VS Code"), ("cursor", "Cursor"), ("windsurf", "Windsurf"),
+            ("zed", "Zed"), ("subl", "Sublime Text"), ("nvim", "Neovim"),
+            ("code-insiders", "VS Code Insiders"),
+        ];
+        LINUX_EDITORS.iter().filter_map(|&(bin, name)| {
+            config::which_path(bin).map(|_| EditorInfo {
+                bundle_id: bin.to_string(),
+                display_name: name.to_string(),
+            })
+        }).collect()
+    }).await.map_err(|e| e.to_string())?;
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let found: Vec<EditorInfo> = vec![];
+
     *state.installed_editors.lock() = Some(found.clone());
     Ok(found)
 }
 
-/// Open a path in the given editor using macOS `open -b <bundle_id> <path>`.
-/// Fire-and-forget: we spawn `open` and don't wait for it (waiting blocks the
-/// Tauri command thread for seconds while LaunchServices brings the app forward).
+/// Open a path in the given editor. On macOS this uses `open -b <bundle_id>
+/// <path>`; on Linux `bundle_id` is the launch binary name, resolved via PATH.
+/// Fire-and-forget: we spawn the editor and don't wait for it (waiting blocks
+/// the Tauri command thread for seconds while the app brings itself forward).
 #[tauri::command]
 pub fn open_in_editor(bundle_id: String, path: PathBuf) -> Result<(), String> {
-    let open_bin = config::which_path("open").ok_or_else(|| "open not found in PATH".to_string())?;
-    Command::new(open_bin)
-        .args(["-b", &bundle_id])
-        .arg(&path)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    #[cfg(target_os = "macos")]
+    {
+        let open_bin =
+            config::which_path("open").ok_or_else(|| "open not found in PATH".to_string())?;
+        Command::new(open_bin)
+            .args(["-b", &bundle_id])
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let bin = config::which_path(&bundle_id).ok_or_else(|| format!("{bundle_id} not found"))?;
+        Command::new(bin).arg(&path).spawn().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        Err("open_in_editor is not supported on this platform".to_string())
+    }
 }
