@@ -6,8 +6,10 @@
 //           rather than depending on a keychain crate — the output is small
 //           JSON and the call is rare (polled once per minute).
 
+#[cfg(target_os = "macos")]
 use crate::config;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "macos")]
 use sha2::{Digest, Sha256};
 #[cfg(target_os = "macos")]
 use std::process::Command;

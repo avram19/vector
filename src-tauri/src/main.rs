@@ -15,7 +15,6 @@ mod worktree_session;
 
 use serde::Serialize;
 use std::sync::Arc;
-#[cfg(target_os = "macos")]
 use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -837,15 +836,12 @@ fn main() {
                 });
             }
 
-            // Menu bar. On macOS this is the global menu bar. On Linux/Windows
-            // the same menu renders as an in-window GTK bar that follows the
-            // system theme (not Vector's) and duplicates in-app actions, so we
-            // install it on macOS only. Copy/paste on Linux/Windows is bound via
-            // Ctrl+Shift+C / Ctrl+Shift+V in the terminal handler instead.
-            #[cfg(target_os = "macos")]
-            {
-            // Replacing the default menu loses macOS's built-in
+            // Native menu bar. Replacing the default menu loses macOS's built-in
             // items, so we rebuild App / Edit / View / Window / Help explicitly.
+            // On Linux/Windows Tauri renders this in-window; its light/dark color
+            // follows the native GTK theme, which the frontend syncs to Vector's
+            // theme via window.setTheme(). Copy/paste on Linux/Windows is bound
+            // to Ctrl+Shift+C / Ctrl+Shift+V in the terminal handler.
             let about_meta = AboutMetadataBuilder::new()
                 .name(Some("Vector"))
                 .version(Some(env!("CARGO_PKG_VERSION")))
@@ -891,7 +887,6 @@ fn main() {
                     let _ = handle.emit("menu://check-updates", ());
                 }
             });
-            }
             Ok(())
         })
         .run(tauri::generate_context!())

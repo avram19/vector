@@ -834,6 +834,13 @@ export default function App() {
   const themeInitDone = useRef(false);
   useEffect(() => {
     document.body.className = themeName === "light" ? "theme-light" : "theme-dark";
+    // Linux/Windows only: sync the native GTK chrome (in-window menu bar +
+    // titlebar) to Vector's theme, so they aren't stuck in the system's
+    // light/dark variant. macOS uses the global menu bar + system appearance,
+    // which we leave untouched.
+    if (!isMac) {
+      void getCurrentWindow().setTheme(themeName === "light" ? "light" : "dark").catch(() => {});
+    }
     if (!themeInitDone.current) { themeInitDone.current = true; return; }
     const restartable = new Set(agentsRef.current.filter((a) => a.restartableOnThemeChange).map((a) => a.id));
     const stale: Record<string, boolean> = {};
@@ -1261,36 +1268,26 @@ export default function App() {
         setActiveId(tabs[nextIdx].id);
         return;
       }
-      if (!isMod(e)) return;
-      // Match on e.code (physical key), not e.key: under the Linux/Windows
-      // Ctrl+Shift chord, Shift mutates e.key ("t"→"T", ","→"<", "1"→"!"), so
-      // e.key equality silently misses. e.code ("KeyT","Comma","Digit1") is
-      // Shift-independent and identical on macOS. The macOS-only guards below
-      // still gate on modifier STATE (reject stray Alt, and on macOS the
-      // Ctrl/Shift that would collide with the mac-only Cmd chord).
-      if (e.code === "Comma" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
-        e.preventDefault();
-        setSettingsOpen((o) => !o);
-        return;
+      // Settings and font-zoom don't collide with terminal/readline control
+      // keys, so they use the plain primary modifier (Ctrl on Linux/Windows,
+      // ⌘ on macOS) — no Shift required. The Ctrl+Shift chord (isMod) is reserved
+      // below for shortcuts that WOULD hit readline (Ctrl+T/W/K/R/D).
+      const baseMod = isMac ? e.metaKey : e.ctrlKey;
+      if (baseMod && !e.altKey) {
+        if (e.code === "Comma" && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
+          e.preventDefault(); setSettingsOpen((o) => !o); return;
+        }
+        if (e.code === "Equal") { e.preventDefault(); setFontSize((s) => clamp(s + 1, 8, 40)); return; }
+        if (e.code === "Minus") { e.preventDefault(); setFontSize((s) => clamp(s - 1, 8, 40)); return; }
+        if (e.code === "Digit0") { e.preventDefault(); setFontSize(13); return; }
       }
+      // Everything below needs the platform's app chord: ⌘ on macOS, Ctrl+Shift
+      // elsewhere (plain Ctrl belongs to the terminal). Match on e.code (physical
+      // key) — under Ctrl+Shift, Shift mutates e.key ("t"→"T", "1"→"!").
+      if (!isMod(e)) return;
       if (e.code === "KeyK" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
         e.preventDefault();
         setSwitcherOpen((o) => !o);
-        return;
-      }
-      if (e.code === "Equal") {
-        e.preventDefault();
-        setFontSize((s) => clamp(s + 1, 8, 40));
-        return;
-      }
-      if (e.code === "Minus") {
-        e.preventDefault();
-        setFontSize((s) => clamp(s - 1, 8, 40));
-        return;
-      }
-      if (e.code === "Digit0") {
-        e.preventDefault();
-        setFontSize(13);
         return;
       }
       if (e.code === "KeyT" && (!isMac || !e.shiftKey)) { e.preventDefault(); openPickerForNewTab(); }
