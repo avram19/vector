@@ -9,7 +9,8 @@ export default defineConfig({
     starlight({
       title: "Vector",
       description: "An agent-first terminal — every tab runs a coding agent.",
-      logo: { src: "./src/assets/placeholders/logo.svg", replacesTitle: false },
+      logo: { src: "./src/assets/logo.png", replacesTitle: false },
+      favicon: "/favicon.png",
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/avram19/vector" },
       ],
