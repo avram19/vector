@@ -35,6 +35,14 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Guard: all three version files must agree. tauri-action builds from
+          # tauri.conf.json, so a mismatch ships mislabeled artifacts (as v0.4.1 did).
+          TAURI_V=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          CARGO_V=$(grep -m1 '^version' src-tauri/Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$VERSION" != "$TAURI_V" ] || [ "$VERSION" != "$CARGO_V" ]; then
+            echo "::error::Version mismatch — package.json=$VERSION tauri.conf.json=$TAURI_V Cargo.toml=$CARGO_V"
+            exit 1
+          fi
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
             echo "v$VERSION already tagged — nothing to release."
             echo "release=false" >> "$GITHUB_OUTPUT"
