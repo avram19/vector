@@ -2015,6 +2015,13 @@ function Keycap({ k }: { k: string }) {
 }
 
 function modIcon(k: string): React.ReactNode | null {
+  // Off macOS, modifiers read as text ("Ctrl"/"Shift"/"Alt") — the ⌘⇧⌥⌃
+  // glyphs are macOS conventions and confuse Linux/Windows users.
+  if (!isMac) {
+    if (k === "cmd" || k === "ctrl") return "Ctrl";
+    if (k === "shift") return "Shift";
+    if (k === "opt") return "Alt";
+  }
   const sz = 11;
   const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (k) {
@@ -2062,6 +2069,33 @@ function arrowSvg(d: string) {
     </svg>
   );
 }
+
+// Shortcut table. `mac` = the ⌘ chords; `other` = the Linux/Windows chords,
+// where app actions use Ctrl+Shift (plain Ctrl belongs to the terminal) except
+// settings/zoom, which don't collide and stay on plain Ctrl. Keep in sync with
+// the keydown handler and the README Shortcuts table.
+const SHORTCUTS: { mac: string[]; other: string[]; label: string }[] = [
+  { mac: ["cmd", "T"], other: ["ctrl", "shift", "T"], label: "New tab" },
+  { mac: ["cmd", "W"], other: ["ctrl", "shift", "W"], label: "Close active pane" },
+  { mac: ["cmd", "D"], other: ["ctrl", "shift", "D"], label: "Split pane right" },
+  { mac: ["cmd", "shift", "D"], other: ["ctrl", "shift", "E"], label: "Split pane down" },
+  { mac: ["cmd", "opt", "left"], other: ["ctrl", "shift", "opt", "left"], label: "Focus pane left" },
+  { mac: ["cmd", "opt", "right"], other: ["ctrl", "shift", "opt", "right"], label: "Focus pane right" },
+  { mac: ["cmd", "opt", "up"], other: ["ctrl", "shift", "opt", "up"], label: "Focus pane up" },
+  { mac: ["cmd", "opt", "down"], other: ["ctrl", "shift", "opt", "down"], label: "Focus pane down" },
+  { mac: ["cmd", "shift", "R"], other: ["ctrl", "shift", "R"], label: "Reload active pane" },
+  { mac: ["cmd", "1–9"], other: ["ctrl", "shift", "1–9"], label: "Switch tab" },
+  { mac: ["ctrl", "Tab"], other: ["ctrl", "Tab"], label: "Next tab" },
+  { mac: ["ctrl", "shift", "Tab"], other: ["ctrl", "shift", "Tab"], label: "Previous tab" },
+  { mac: ["shift", "enter"], other: ["shift", "enter"], label: "Multi-line input (Claude Code)" },
+  { mac: ["cmd", ","], other: ["ctrl", ","], label: "Open settings" },
+  { mac: ["cmd", "+"], other: ["ctrl", "+"], label: "Zoom in" },
+  { mac: ["cmd", "−"], other: ["ctrl", "−"], label: "Zoom out" },
+  { mac: ["cmd", "0"], other: ["ctrl", "0"], label: "Reset zoom" },
+  { mac: ["cmd", "k"], other: ["ctrl", "shift", "k"], label: "Switch agent" },
+  { mac: ["cmd", "c"], other: ["ctrl", "shift", "c"], label: "Copy selection" },
+  { mac: ["cmd", "v"], other: ["ctrl", "shift", "v"], label: "Paste" },
+];
 
 function Shortcut({ keys, label }: { keys: string[]; label: string }) {
   return (
@@ -2449,24 +2483,9 @@ function SettingsModal({
               <>
                 <h2 className="settings-section-title">Keyboard shortcuts</h2>
                 <div className="shortcuts-list">
-                  <Shortcut keys={["cmd", "T"]} label="New tab" />
-                  <Shortcut keys={["cmd", "W"]} label="Close active pane" />
-                  <Shortcut keys={["cmd", "D"]} label="Split pane right" />
-                  <Shortcut keys={["cmd", "shift", "D"]} label="Split pane down" />
-                  <Shortcut keys={["cmd", "opt", "left"]} label="Focus pane left" />
-                  <Shortcut keys={["cmd", "opt", "right"]} label="Focus pane right" />
-                  <Shortcut keys={["cmd", "opt", "up"]} label="Focus pane up" />
-                  <Shortcut keys={["cmd", "opt", "down"]} label="Focus pane down" />
-                  <Shortcut keys={["cmd", "shift", "R"]} label="Reload active pane" />
-                  <Shortcut keys={["cmd", "1–9"]} label="Switch tab" />
-                  <Shortcut keys={["ctrl", "Tab"]} label="Next tab" />
-                  <Shortcut keys={["ctrl", "shift", "Tab"]} label="Previous tab" />
-                  <Shortcut keys={["shift", "enter"]} label="Multi-line input (Claude Code)" />
-                  <Shortcut keys={["cmd", ","]} label="Open settings" />
-                  <Shortcut keys={["cmd", "+"]} label="Zoom in" />
-                  <Shortcut keys={["cmd", "−"]} label="Zoom out" />
-                  <Shortcut keys={["cmd", "0"]} label="Reset zoom" />
-                  <Shortcut keys={["cmd", "k"]} label="Switch agent" />
+                  {SHORTCUTS.map((s, i) => (
+                    <Shortcut key={i} keys={isMac ? s.mac : s.other} label={s.label} />
+                  ))}
                 </div>
               </>
             )}
