@@ -1851,6 +1851,7 @@ export default function App() {
           </button>
         ) : <div style={{ flex: "0 0 auto" }} />}
         <select
+          className="agent-select"
           value={activePty?.agentId ?? ""}
           onChange={(e) => changeActiveAgent(e.target.value)}
           disabled={!activePty}

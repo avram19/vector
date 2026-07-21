@@ -157,8 +157,11 @@
   --gh-star: #d9a23a;
   --gh-link: #58a6ff;
   --gh-pop-bg: #1d1d27;
+  /* Render native controls (select popups, scrollbars, inputs) dark to match. */
+  color-scheme: dark;
 }
 body.theme-light {
+  color-scheme: light;
   --gh-fg: #33404a;
   --gh-muted: rgba(74,86,98,0.88);
   --gh-faint: rgba(84,96,108,0.62);
@@ -175,6 +178,25 @@ body.theme-light {
   --gh-link: #1f6feb;
   --gh-pop-bg: #fbf4e3;
 }
+
+/* Agent selector in the tab toolbar. Bare <select> renders as an unthemed
+   native GTK control on WebKitGTK; style it explicitly (with a custom caret,
+   since appearance:none drops the native arrow) so it reads in both themes. */
+.agent-select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  font: inherit; font-size: 13px;
+  color: var(--gh-fg);
+  background-color: var(--gh-input-bg);
+  border: 1px solid var(--gh-border);
+  border-radius: 6px;
+  padding: 5px 26px 5px 10px;
+  cursor: pointer;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="%23888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+.agent-select:disabled { opacity: 0.55; cursor: default; }
+.agent-select option { color: var(--gh-fg); background: var(--gh-pop-bg); }
 .gh-empty { padding: 16px; color: var(--gh-muted); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; font-size: 13px; }
 .gh-empty a { color: var(--gh-link); }
 .gh-empty b { color: var(--gh-fg); }
