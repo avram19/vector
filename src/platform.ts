@@ -8,3 +8,7 @@ export const isMac = platform() === "macos";
 export function isMod(e: KeyboardEvent): boolean {
   return isMac ? e.metaKey : e.ctrlKey && e.shiftKey;
 }
+
+/** Label for the "reveal a path in the OS file manager" action:
+ *  Finder on macOS, the generic Files app elsewhere. */
+export const revealLabel = isMac ? "Reveal in Finder" : "Show in Files";

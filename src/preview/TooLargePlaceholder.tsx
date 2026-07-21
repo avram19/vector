@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { revealLabel } from "../platform";
 
 function fmtBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -28,7 +29,7 @@ export function TooLargePlaceholder({
         style={{ marginLeft: 8 }}
         onClick={() => invoke("reveal_in_finder", { path: filePath })}
       >
-        Reveal in Finder
+        {revealLabel}
       </button>
     </div>
   );

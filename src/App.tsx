@@ -27,7 +27,7 @@ import { PrReviewView } from "./github/PrReviewView";
 import { useEscapeToClose } from "./useEscapeToClose";
 import { makeCwdSniffer } from "./shell/cwdSniffer";
 import { makeAutocompleteAddon } from "./shell/autocompleteAddon";
-import { isMod, isMac } from "./platform";
+import { isMod, isMac, revealLabel } from "./platform";
 
 // Compare two `X.Y.Z` version strings. Returns negative if a<b, 0 if equal, positive if a>b.
 // Non-numeric chunks (pre-release tags like `-beta.1`) are ignored — we only ship stable releases.
@@ -4291,7 +4291,7 @@ function TerminalContextMenu({ menu, onClose }: { menu: TermMenuData; onClose: (
     });
     if (menu.linkKind === "path") {
       items.push({
-        label: isMac ? "Reveal in Finder" : "Show in Files",
+        label: revealLabel,
         onClick: () => { invoke("reveal_in_finder", { path: menu.uri }).catch(() => {}); onClose(); },
       });
     }
