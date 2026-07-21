@@ -5,9 +5,11 @@ name: release
 # platform and publish a GitHub release with the updater manifest (latest.json).
 # Ordinary merges that don't change the version do nothing.
 #
-# Requires two repo secrets (Settings > Secrets and variables > Actions):
+# Requires repo secrets (Settings > Secrets and variables > Actions):
 #   TAURI_SIGNING_PRIVATE_KEY           contents of ~/.config/vector-updater/private.ke
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  that key's passphrase
+#   ANTHROPIC_API_KEY                   for AI-written "What's new" notes (falls back
+#                                       to a minimal body if unset or the call fails)
 #
 # macOS ships unsigned (Gatekeeper warning); Linux AppImage needs no signing.
 # Windows is intentionally excluded until Milestone 2 (windows.rs is stubbed).
@@ -26,7 +28,7 @@ jobs:
     outputs:
       release: ${{ steps.check.outputs.release }}
       version: ${{ steps.check.outputs.version }}
-      notes: ${{ steps.check.outputs.notes }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,13 +51,23 @@ jobs:
             exit 0
           fi
           echo "release=true" >> "$GITHUB_OUTPUT"
-          # Auto notes: commit subjects since the previous tag, minus housekeeping.
-          PREV=$(git tag --list 'v*' --sort=-v:refname | head -1)
-          RANGE=$([ -n "$PREV" ] && echo "${PREV}..HEAD" || echo "HEAD")
+          echo "prev=$(git tag --list 'v*' --sort=-v:refname | head -1)" >> "$GITHUB_OUTPUT"
+      # AI-written "What's new" notes (Claude). Only runs on an actual release.
+      - if: steps.check.outputs.release == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - if: steps.check.outputs.release == 'true'
+        run: npm ci
+      - id: notes
+        if: steps.check.outputs.release == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          NOTES=$(node scripts/gen-release-notes.mjs "${{ steps.check.outputs.prev }}" "${{ steps.check.outputs.version }}")
           {
             echo "notes<<__EOF__"
-            git log --no-merges --pretty='- %s' "$RANGE" \
-              | grep -viE '^- (release|chore|docs\(sdd\)):' | head -60
+            echo "$NOTES"
             echo "__EOF__"
           } >> "$GITHUB_OUTPUT"
 
