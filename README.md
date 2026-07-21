@@ -1,5 +1,9 @@
 # Vector
 
+[![Downloads](https://img.shields.io/github/downloads/avram19/vector/total)](https://github.com/avram19/vector/releases)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](./LICENSE)
+[![Docs](https://img.shields.io/badge/docs-avram19.github.io%2Fvector-informational)](https://avram19.github.io/vector/)
+
 An agent-first terminal. Every tab starts inside your favorite coding agent
 (Claude Code, Codex, Cursor Agent, GitHub Copilot CLI, Aider, Gemini, Amazon
 Q, OpenCode, Crush, Goose, Amp, Plandex, Continue, Qodo — or a raw shell),
@@ -9,145 +13,41 @@ not a shell prompt.
   <img src="src/logo.png" alt="Vector" width="96" />
 </p>
 
-## Table of Contents
+**📖 Full docs, features, shortcuts, and guides: [avram19.github.io/vector](https://avram19.github.io/vector/)**
 
-- [Features](#features)
-  - [Agent-native tabs](#agent-native-tabs)
-  - [Claude Profiles](#claude-profiles)
-  - [Pane splits](#pane-splits)
-  - [File Previewer](#file-previewer)
-  - [Sidebar — files & worktrees](#sidebar--files--worktrees)
-  - [GitHub — repos, pull requests & actions](#github--repos-pull-requests--actions)
-  - [Resume Claude sessions](#resume-claude-sessions)
-  - [Auto-detect installed agents](#auto-detect-installed-agents)
-  - [Project picker](#project-picker)
-  - [Per-tab agent swap](#per-tab-agent-swap)
-  - [Claude usage meter](#claude-usage-meter)
-  - [Terminal context menu](#terminal-context-menu)
-  - [Bell notifications](#bell-notifications)
-  - [Theme](#theme)
-  - [Tab layout](#tab-layout)
-  - [Per-agent icons and chips](#per-agent-icons-and-chips)
-- [Shortcuts](#shortcuts)
-- [Claude Profiles (in depth)](#claude-profiles-in-depth)
-- [How it was built](#how-it-was-built)
-- [Try it](#try-it)
-- [Build from source](#build-from-source)
-- [Add a custom agent](#add-a-custom-agent)
-- [License](#license)
+## Install
 
-## Features
+**macOS** — download the latest `.dmg` from [Releases](https://github.com/avram19/vector/releases), drag Vector into `/Applications`, and open it. The build is unsigned, so Gatekeeper blocks it the first time — right-click → Open, or run `xattr -dr com.apple.quarantine /Applications/Vector.app`.
 
-### Agent-native tabs
+**Linux** (x86_64/aarch64, WebKitGTK) — grab the `.AppImage` or `.deb` from [Releases](https://github.com/avram19/vector/releases); for the AppImage, `chmod +x Vector_*.AppImage` and run it.
 
-`⌘T` opens a new tab already inside an agent, scoped to a project folder you pick.
+Full install steps and first-run notes: [docs → Getting Started → Install](https://avram19.github.io/vector/getting-started/install/).
 
-### Claude Profiles
+## Build from source
 
-Map folders to separate Claude accounts (`CLAUDE_CONFIG_DIR` under the hood). Open `~/work` with your work account, `~/personal` with your personal one — no more `/logout` → `/login`. [Read more](#claude-profiles-in-depth).
+Requirements: Rust (stable), Node 20+, macOS / Linux / Windows.
 
-### Pane splits
+```bash
+npm install
+npm run tauri dev       # dev build with HMR
+npm run tauri build     # produce .app + .dmg in src-tauri/target/release/bundle/
+```
 
-Split a tab into a grid of agent panes with `⌘D` / `⌘⇧D`, drag dividers to resize, drag panes between tabs. Each pane runs its own agent.
+More detail: [docs → Architecture → Build from source](https://avram19.github.io/vector/architecture/build-from-source/).
 
-### File Previewer
+## Add a custom agent
 
-⌘-click any file path printed by an agent to open a read-only preview in a side pane on the same tab. Supports Markdown (with embedded Mermaid diagrams), standalone Mermaid, syntax-highlighted code (js/ts/py/rs/rb and other common formats), PDF, and images. ⌘⇧-click pins a second preview for side-by-side compare. Right-click any path or preview pane for **Reveal in Finder**, **Open in default app**, or **Copy path**.
+Drop a TOML file at `~/.config/vector/config.toml` describing the agent's command and env — Vector merges it with the built-in list on every launch. See [docs → Agents → Add a custom agent](https://avram19.github.io/vector/agents/custom-agent/) for the full schema and an example.
 
-### Sidebar — files & worktrees
+## Learn more
 
-A collapsible sidebar with two tabs, both scoped to the focused tab's project:
+Everything else — features, keyboard shortcuts, Claude Profiles, the sidebar, GitHub tab, file previewer, and more — lives in the docs:
 
-- **Files** — VSCode-style tree of the project root with hidden-files toggle. Click to open a preview, ⌘⇧-click to pin a second preview. Right-click for Reveal in Finder, Open in default app, Open in installed editor (VS Code / Cursor / Zed / Windsurf / WebStorm / IntelliJ / PyCharm / Sublime), or Copy path. Tree refreshes live as the agent writes files.
-- **Worktrees** — every git repo discovered under the project, grouped by repo. Each worktree expands to show **Uncommitted** and **Committed (vs base)** changes. Click a change to open a unified diff with syntax highlighting in the preview pane. Toggle between flat and tree views from the search bar; both persist across restarts. Right-click a worktree for Reveal / Open / Open in editor.
-
-Sidebar width, active tab, collapsed state, hidden-files toggle, and worktrees view mode all persist via `~/.config/vector/ui.toml`.
-
-### GitHub — repos, pull requests & actions
-
-A third sidebar tab that turns Vector into a GitHub cockpit, authenticated through your existing `gh` CLI login (no tokens stored — it inherits your exact scopes and org SSO). Three sub-tabs:
-
-- **Repos** — every repo you can see, auto-grouped by org with your own custom groups, a Favorites section, pin/drag-to-group/right-click actions, and search. Archived repos are hidden until you search. Renders instantly from an on-disk cache, then refreshes. Click a repo's PR-count badge to jump to its pull requests; right-click → **Open Actions**.
-- **Pull Requests** — an account-wide inbox split into **My Pull Requests** (Needs Action / Ready to Merge / Waiting / Done) and **Team Pull Requests** (review-requested), with CI/review/conflict/merged/closed badges, a searchable repo filter, search by title or number, "View more" paging, and an unread-activity dot. A **Deploy** button on any PR opens the workflow trigger prefilled with that PR's branch.
-- **Actions** — a favorited-workflows dashboard across repos plus per-repo drill-down (workflows → runs → jobs); open a finished job's logs in the preview pane, **re-run** / **re-run failed** / **cancel** a run, or **trigger** a `workflow_dispatch` with a typed input form (boolean inputs collapse into one searchable multi-select).
-
-The GitHub rail icon shows a badge for unread activity on PRs you authored or were asked to review (in-app only — no system notifications); it clears when you open the tab. Groups, pins, favorited workflows, and seen-state persist in `~/.config/vector/ui.toml`.
-
-### Resume Claude sessions
-
-The project picker surfaces the session history for the folder you chose, so you can jump back into a conversation instead of starting fresh.
-
-### Auto-detect installed agents
-
-Scans `PATH` for known CLIs; only shows ones you actually have.
-
-### Project picker
-
-Remembers recents, one picker per new tab.
-
-### Per-tab agent swap
-
-Change agent from the topbar dropdown; session restarts cleanly.
-
-### Claude usage meter
-
-Live 5-hour and 7-day usage bars in the topbar when a Claude pane is active.
-
-### Terminal context menu
-
-Right-click a URL or file path to Open / Reveal in Finder / Copy. Right-click a selection to **Copy as plain text** (strips NBSP, zero-width chars, and Claude's indent gutter so pasting into Slack or docs doesn't look weird).
-
-### Bell notifications
-
-When an agent emits `\x07` (asking for input) and the tab is inactive or the window is unfocused, the tab is highlighted and a macOS notification fires.
-
-### Theme
-
-Dark or Solarized Light.
-
-### Tab layout
-
-Horizontal on top, or vertical sidebar.
-
-### Per-agent icons and chips
-
-Per-agent icons and chips in every tab.
-
-## Shortcuts
-
-| Shortcut | Action |
-| --- | --- |
-| `⌘T` | New tab (opens project picker) |
-| `⌘W` | Close active pane |
-| `⌘D` / `⌘⇧D` | Split pane right / down |
-| `⌘⌥←` `⌘⌥→` `⌘⌥↑` `⌘⌥↓` | Focus adjacent pane |
-| `⌘⇧R` | Reload (restart) active agent |
-| `⌘1`…`⌘9` | Switch tab |
-| `⌃⇥` / `⌃⇧⇥` | Next / previous tab |
-| `⌘,` | Open Settings |
-| `⇧↵` | Multi-line input (Claude Code) |
-| `⌘←` / `⌘→` | Cursor to line start / end (while typing) |
-| `⌥←` / `⌥→` | Cursor back / forward one word |
-| `⌘⌫` / `⌥⌫` | Delete to line start / word start |
-
-> **Linux / Windows:** app-action shortcuts use **Ctrl+Shift** instead of ⌘,
-> because plain Ctrl belongs to the terminal (Ctrl+C/D/U reach the shell). So
-> new tab is `Ctrl+Shift+T`, close `Ctrl+Shift+W`, split `Ctrl+Shift+D` / `Ctrl+Shift+E`,
-> reload `Ctrl+Shift+R`. Settings (`Ctrl+,`) and zoom (`Ctrl+= / − / 0`) need no
-> Shift. Terminal copy/paste is `Ctrl+Shift+C` / `Ctrl+Shift+V`.
-
-## Claude Profiles (in depth)
-
-If you juggle two Claude accounts — say personal and work — the usual flow is painful: Claude Code keeps a single login in `~/.claude/`, so switching means `/logout` then `/login` every time you move between folders.
-
-Vector solves this by mapping **folders → profiles**, where each profile is an isolated Claude home (`~/.claude-profiles/<id>/`) injected via `CLAUDE_CONFIG_DIR` when a Claude session starts in a matched folder.
-
-- **Open Settings** (`⌘,`) → **Claude Profiles** → **Add profile**.
-- Pick a name, the folders that should use it, and (under **Advanced**) a **Seed from** source — defaults to `~/.claude`, or point it at `~/.claude-work` / any existing Claude home. Credentials, `settings.json`, and `projects/` history are copied over so the new profile starts with your real state instead of a blank install.
-- macOS stores Claude credentials in Keychain by default; seeding copies everything else but the new profile will still prompt `/login` once — after that it sticks.
-- Each Claude tab shows a small pill with the active profile. Click it to override for just that tab (ephemeral) or jump to **Manage profiles**.
-
-Folders not mapped to any profile continue to use your existing `~/.claude/` — upgrading Vector never touches your default login.
+- [Getting Started](https://avram19.github.io/vector/getting-started/install/)
+- [Guide: Shortcuts](https://avram19.github.io/vector/guide/shortcuts/)
+- [Guide: Claude Profiles](https://avram19.github.io/vector/guide/profiles/)
+- [Agents: full agent list](https://avram19.github.io/vector/agents/agent-list/)
+- [Architecture: how it's built](https://avram19.github.io/vector/architecture/how-its-built/)
 
 ## How it was built
 
@@ -160,65 +60,6 @@ the human who scoped the project.
 If you're curious what "agentic software development" looks like end-to-end,
 this repository is one example: read the requirements, read the code, and
 judge for yourself.
-
-## Try it
-
-Download the latest `.dmg` from the [Releases](https://github.com/avram19/vector/releases)
-page, drag Vector into `/Applications`, and open it.
-
-Because the build is unsigned, macOS Gatekeeper will block it the first time.
-To bypass once:
-
-```
-# Option A — right-click Open
-Right-click Vector.app → Open → Open
-
-# Option B — remove the quarantine attribute
-xattr -dr com.apple.quarantine /Applications/Vector.app
-```
-
-After the first launch, you can open it normally from Launchpad or
-Spotlight.
-
-On first launch Vector will ask for Notification permission (so agents can
-alert you when they need input) — grant it in System Settings if you dismiss
-the prompt.
-
-### Linux
-
-Vector runs on Linux (x86_64 and aarch64) via WebKitGTK. Grab the `.AppImage`
-or `.deb` from the [Releases](https://github.com/avram19/vector/releases) page —
-for the AppImage, `chmod +x Vector_*.AppImage` and run it. Clipboard file-paste
-uses `wl-clipboard` (Wayland) or `xclip` (X11); "Show in Files" opens your
-desktop's file manager. Runtime deps are the usual WebKitGTK set
-(`libwebkit2gtk-4.1`, `libgtk-3`, `libayatana-appindicator3`).
-
-## Build from source
-
-Requirements: Rust (stable), Node 20+, macOS / Linux / Windows.
-
-```bash
-npm install
-npm run tauri dev       # dev build with HMR
-npm run tauri build     # produce .app + .dmg in src-tauri/target/release/bundle/
-```
-
-## Add a custom agent
-
-Drop a TOML file at `~/.config/vector/config.toml`:
-
-```toml
-default = "claude"
-
-[agents.myagent]
-label = "My Custom Agent"
-command = ["my-cli", "--flag"]
-
-[agents.myagent.env]
-MY_API_KEY = "..."
-```
-
-Vector merges this with the built-in list on every launch.
 
 ## License
 
