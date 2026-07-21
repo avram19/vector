@@ -5,11 +5,11 @@ name: release
 # platform and publish a GitHub release with the updater manifest (latest.json).
 # Ordinary merges that don't change the version do nothing.
 #
-# Requires repo secrets (Settings > Secrets and variables > Actions):
+# Requires two repo secrets (Settings > Secrets and variables > Actions):
 #   TAURI_SIGNING_PRIVATE_KEY           contents of ~/.config/vector-updater/private.ke
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  that key's passphrase
-#   ANTHROPIC_API_KEY                   for AI-written "What's new" notes (falls back
-#                                       to a minimal body if unset or the call fails)
+#
+# Release notes come from the matching CHANGELOG.md section (see that file).
 #
 # macOS ships unsigned (Gatekeeper warning); Linux AppImage needs no signing.
 # Windows is intentionally excluded until Milestone 2 (windows.rs is stubbed).
@@ -52,22 +52,32 @@ jobs:
           fi
           echo "release=true" >> "$GITHUB_OUTPUT"
           echo "prev=$(git tag --list 'v*' --sort=-v:refname | head -1)" >> "$GITHUB_OUTPUT"
-      # AI-written "What's new" notes (Claude). Only runs on an actual release.
-      - if: steps.check.outputs.release == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - if: steps.check.outputs.release == 'true'
-        run: npm ci
+      # Release notes: the CHANGELOG.md section for this version. Falls back to
+      # GitHub's auto-generated notes if there's no entry, so a release is never blocked.
       - id: notes
         if: steps.check.outputs.release == 'true'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES=$(node scripts/gen-release-notes.mjs "${{ steps.check.outputs.prev }}" "${{ steps.check.outputs.version }}")
+          VERSION="${{ steps.check.outputs.version }}"
+          # Extract lines between the version heading (## [X.Y.Z] or ## X.Y.Z) and
+          # the next ## heading; strip leading blank lines.
+          BODY=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[?" ver "\\]?" { flag=1; next }
+            flag && /^## / { exit }
+            flag { print }
+          ' CHANGELOG.md | sed '/./,$!d')
+          if [ -z "$(printf %s "$BODY" | tr -d '[:space:]')" ]; then
+            echo "::warning::No CHANGELOG.md entry for v$VERSION — using auto-generated notes."
+            PREV="${{ steps.check.outputs.prev }}"
+            ARGS=""
+            [ -n "$PREV" ] && ARGS="-f previous_tag_name=$PREV"
+            BODY=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+              -f tag_name="v$VERSION" -f target_commitish="${{ github.sha }}" $ARGS --jq .body)
+          fi
           {
             echo "notes<<__EOF__"
-            echo "$NOTES"
+            printf '%s\n' "$BODY"
             echo "__EOF__"
           } >> "$GITHUB_OUTPUT"
 
