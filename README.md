@@ -130,6 +130,12 @@ Per-agent icons and chips in every tab.
 | `⌥←` / `⌥→` | Cursor back / forward one word |
 | `⌘⌫` / `⌥⌫` | Delete to line start / word start |
 
+> **Linux / Windows:** app-action shortcuts use **Ctrl+Shift** instead of ⌘,
+> because plain Ctrl belongs to the terminal (Ctrl+C/D/U reach the shell). So
+> new tab is `Ctrl+Shift+T`, close `Ctrl+Shift+W`, split `Ctrl+Shift+D` / `Ctrl+Shift+E`,
+> reload `Ctrl+Shift+R`. Settings (`Ctrl+,`) and zoom (`Ctrl+= / − / 0`) need no
+> Shift. Terminal copy/paste is `Ctrl+Shift+C` / `Ctrl+Shift+V`.
+
 ## Claude Profiles (in depth)
 
 If you juggle two Claude accounts — say personal and work — the usual flow is painful: Claude Code keeps a single login in `~/.claude/`, so switching means `/logout` then `/login` every time you move between folders.
@@ -177,6 +183,15 @@ Spotlight.
 On first launch Vector will ask for Notification permission (so agents can
 alert you when they need input) — grant it in System Settings if you dismiss
 the prompt.
+
+### Linux
+
+Vector runs on Linux (x86_64 and aarch64) via WebKitGTK. Grab the `.AppImage`
+or `.deb` from the [Releases](https://github.com/avram19/vector/releases) page —
+for the AppImage, `chmod +x Vector_*.AppImage` and run it. Clipboard file-paste
+uses `wl-clipboard` (Wayland) or `xclip` (X11); "Show in Files" opens your
+desktop's file manager. Runtime deps are the usual WebKitGTK set
+(`libwebkit2gtk-4.1`, `libgtk-3`, `libayatana-appindicator3`).
 
 ## Build from source
 

@@ -5,6 +5,7 @@ mod config;
 mod fs_watch;
 mod git;
 mod github;
+mod platform;
 mod preview;
 mod pty;
 mod sessions;
@@ -63,6 +64,8 @@ async fn default_agent(state: State<'_, AppState>) -> Result<String, String> {
 fn default_shell() -> Vec<String> {
     if cfg!(windows) {
         vec!["powershell.exe".into()]
+    } else if cfg!(target_os = "linux") {
+        vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into())]
     } else {
         vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into())]
     }
@@ -269,6 +272,18 @@ _vector_osc7
 
         env.push(("ZDOTDIR".into(), zdotdir.to_string_lossy().to_string()));
         env.push(("VECTOR_USER_ZDOTDIR".into(), user_zdotdir));
+    }
+    // bash: PROMPT_COMMAND is read from the environment, so we can inject OSC-7
+    // without a temp rcfile. Prepend so the user's own PROMPT_COMMAND still runs.
+    else if shell.ends_with("/bash") || shell == "bash" {
+        let existing = std::env::var("PROMPT_COMMAND").unwrap_or_default();
+        let osc7 = r#"printf '\033]7;file://%s%s\007' "$HOSTNAME" "$PWD""#;
+        let combined = if existing.is_empty() {
+            osc7.to_string()
+        } else {
+            format!("{osc7}; {existing}")
+        };
+        env.push(("PROMPT_COMMAND".into(), combined));
     }
 
     let cwd_path = cwd
@@ -698,14 +713,7 @@ async fn open_path(path: String) -> Result<(), String> {
         path
     };
 
-    #[cfg(target_os = "macos")]
-    let spawn = std::process::Command::new("/usr/bin/open").arg(&target).spawn();
-    #[cfg(target_os = "linux")]
-    let spawn = std::process::Command::new("xdg-open").arg(&target).spawn();
-    #[cfg(target_os = "windows")]
-    let spawn = std::process::Command::new("cmd").args(["/C", "start", "", &target]).spawn();
-
-    spawn.map(|_| ()).map_err(|e| e.to_string())
+    platform::open_path(&target).map_err(|e| e.to_string())
 }
 
 /// Spawn (or focus, if already open) a standalone OS window containing only
@@ -732,67 +740,7 @@ async fn open_pr_review_window(app: tauri::AppHandle, repo: String, number: u64)
 #[tauri::command]
 fn read_agent_cwd(state: State<'_, AppState>, session_id: String) -> Option<String> {
     let pid = state.registry.child_pid(&session_id)?;
-    #[cfg(target_os = "macos")]
-    {
-        use std::ffi::CStr;
-        use std::mem;
-        use std::os::raw::{c_int, c_void, c_char};
-
-        // PROC_PIDVNODEPATHINFO (flavor 9) returns a proc_vnodepathinfo struct
-        // whose pvi_cdir.vip_path field holds the cwd as a null-terminated C string.
-        // libproc already links libproc.dylib so proc_pidinfo is available as an extern symbol.
-        extern "C" {
-            fn proc_pidinfo(
-                pid: c_int,
-                flavor: c_int,
-                arg: u64,
-                buffer: *mut c_void,
-                buffersize: c_int,
-            ) -> c_int;
-        }
-
-        const PROC_PIDVNODEPATHINFO: c_int = 9;
-        const MAXPATHLEN: usize = 1024;
-
-        // Mirror the macOS proc_vnodepathinfo ABI, verified against bindgen output
-        // from libproc-0.14.11/docs_rs/osx_libproc_bindings.rs:
-        //
-        //   vinfo_stat:        136 bytes  (XNU struct, computed from all fields)
-        //   vnode_info:        152 bytes  (vinfo_stat + vi_type:i32 + vi_pad:i32 + vi_fsid:fsid_t[8])
-        //   vnode_info_path:  1176 bytes  (vnode_info[152] + vip_path[1024])
-        //   proc_vnodepathinfo: 2352 bytes (pvi_cdir + pvi_rdir, both vnode_info_path)
-        //
-        // vip_path is at byte offset 152 within vnode_info_path.
-        #[repr(C)]
-        struct VnodeInfoPath {
-            _vip_vi: [u8; 152],             // vnode_info (opaque)
-            vip_path: [c_char; MAXPATHLEN],
-        }
-
-        #[repr(C)]
-        struct ProcVnodePathInfo {
-            pvi_cdir: VnodeInfoPath,
-            _pvi_rdir: VnodeInfoPath,
-        }
-
-        let mut info: ProcVnodePathInfo = unsafe { mem::zeroed() };
-        let ret = unsafe {
-            proc_pidinfo(
-                pid as c_int,
-                PROC_PIDVNODEPATHINFO,
-                0,
-                &mut info as *mut _ as *mut c_void,
-                mem::size_of::<ProcVnodePathInfo>() as c_int,
-            )
-        };
-        if ret <= 0 {
-            return None;
-        }
-        let cstr = unsafe { CStr::from_ptr(info.pvi_cdir.vip_path.as_ptr()) };
-        cstr.to_str().ok().map(|s| s.to_string())
-    }
-    #[cfg(not(target_os = "macos"))]
-    { None }
+    platform::process_cwd(pid)
 }
 
 fn main() {
@@ -806,6 +754,7 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_os::init())
         .manage(AppState {
             registry: Arc::new(pty::PtyRegistry::new()),
             config: parking_lot::Mutex::new(config::load()),
@@ -889,6 +838,10 @@ fn main() {
 
             // Native menu bar. Replacing the default menu loses macOS's built-in
             // items, so we rebuild App / Edit / View / Window / Help explicitly.
+            // On Linux/Windows Tauri renders this in-window; its light/dark color
+            // follows the native GTK theme, which the frontend syncs to Vector's
+            // theme via window.setTheme(). Copy/paste on Linux/Windows is bound
+            // to Ctrl+Shift+C / Ctrl+Shift+V in the terminal handler.
             let about_meta = AboutMetadataBuilder::new()
                 .name(Some("Vector"))
                 .version(Some(env!("CARGO_PKG_VERSION")))

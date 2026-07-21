@@ -196,16 +196,7 @@ fn builtin() -> Config {
 pub fn augmented_path() -> std::ffi::OsString {
     let mut path = std::env::var_os("PATH").unwrap_or_default();
     if let Some(home) = dirs::home_dir() {
-        let extra = [
-            PathBuf::from("/opt/homebrew/bin"),
-            PathBuf::from("/usr/local/bin"),
-            PathBuf::from("/usr/bin"),
-            PathBuf::from("/bin"),
-            home.join(".local/bin"),
-            home.join(".cargo/bin"),
-            home.join(".npm-global/bin"),
-            home.join(".bun/bin"),
-        ];
+        let extra = crate::platform::extra_path_dirs(&home);
         let mut joined: Vec<PathBuf> = std::env::split_paths(&path).collect();
         for e in extra {
             if !joined.contains(&e) { joined.push(e); }

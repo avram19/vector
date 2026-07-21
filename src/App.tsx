@@ -27,6 +27,7 @@ import { PrReviewView } from "./github/PrReviewView";
 import { useEscapeToClose } from "./useEscapeToClose";
 import { makeCwdSniffer } from "./shell/cwdSniffer";
 import { makeAutocompleteAddon } from "./shell/autocompleteAddon";
+import { isMod, isMac, revealLabel } from "./platform";
 
 // Compare two `X.Y.Z` version strings. Returns negative if a<b, 0 if equal, positive if a>b.
 // Non-numeric chunks (pre-release tags like `-beta.1`) are ignored — we only ship stable releases.
@@ -833,6 +834,13 @@ export default function App() {
   const themeInitDone = useRef(false);
   useEffect(() => {
     document.body.className = themeName === "light" ? "theme-light" : "theme-dark";
+    // Linux/Windows only: sync the native GTK chrome (in-window menu bar +
+    // titlebar) to Vector's theme, so they aren't stuck in the system's
+    // light/dark variant. macOS uses the global menu bar + system appearance,
+    // which we leave untouched.
+    if (!isMac) {
+      void getCurrentWindow().setTheme(themeName === "light" ? "light" : "dark").catch(() => {});
+    }
     if (!themeInitDone.current) { themeInitDone.current = true; return; }
     const restartable = new Set(agentsRef.current.filter((a) => a.restartableOnThemeChange).map((a) => a.id));
     const stale: Record<string, boolean> = {};
@@ -1260,41 +1268,43 @@ export default function App() {
         setActiveId(tabs[nextIdx].id);
         return;
       }
-      if (!e.metaKey) return;
-      if (e.key === "," && !e.shiftKey && !e.altKey && !e.ctrlKey) {
-        e.preventDefault();
-        setSettingsOpen((o) => !o);
-        return;
+      // Settings and font-zoom don't collide with terminal/readline control
+      // keys, so they use the plain primary modifier (Ctrl on Linux/Windows,
+      // ⌘ on macOS) — no Shift required. The Ctrl+Shift chord (isMod) is reserved
+      // below for shortcuts that WOULD hit readline (Ctrl+T/W/K/R/D).
+      const baseMod = isMac ? e.metaKey : e.ctrlKey;
+      if (baseMod && !e.altKey) {
+        if (e.code === "Comma" && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
+          e.preventDefault(); setSettingsOpen((o) => !o); return;
+        }
+        if (e.code === "Equal") { e.preventDefault(); setFontSize((s) => clamp(s + 1, 8, 40)); return; }
+        if (e.code === "Minus") { e.preventDefault(); setFontSize((s) => clamp(s - 1, 8, 40)); return; }
+        if (e.code === "Digit0") { e.preventDefault(); setFontSize(13); return; }
       }
-      if (e.key === "k" && !e.shiftKey && !e.altKey && !e.ctrlKey) {
+      // Everything below needs the platform's app chord: ⌘ on macOS, Ctrl+Shift
+      // elsewhere (plain Ctrl belongs to the terminal). Match on e.code (physical
+      // key) — under Ctrl+Shift, Shift mutates e.key ("t"→"T", "1"→"!").
+      if (!isMod(e)) return;
+      if (e.code === "KeyK" && !e.altKey && (!isMac || (!e.shiftKey && !e.ctrlKey))) {
         e.preventDefault();
         setSwitcherOpen((o) => !o);
         return;
       }
-      if (e.key === "=" || e.key === "+") {
-        e.preventDefault();
-        setFontSize((s) => clamp(s + 1, 8, 40));
-        return;
-      }
-      if (e.key === "-" || e.key === "_") {
-        e.preventDefault();
-        setFontSize((s) => clamp(s - 1, 8, 40));
-        return;
-      }
-      if (e.key === "0") {
-        e.preventDefault();
-        setFontSize(13);
-        return;
-      }
-      if (e.key === "t" && !e.shiftKey) { e.preventDefault(); openPickerForNewTab(); }
-      else if (e.key === "w" && !e.shiftKey) {
+      if (e.code === "KeyT" && (!isMac || !e.shiftKey)) { e.preventDefault(); openPickerForNewTab(); }
+      else if (e.code === "KeyW" && (!isMac || !e.shiftKey)) {
         e.preventDefault();
         const tab = tabs.find((t) => t.id === activeId);
         if (tab) closePane(tab.id, tab.activePaneId);
       }
-      else if ((e.key === "d" || e.key === "D")) {
+      else if (e.code === "KeyD") {
         e.preventDefault();
-        splitActivePane(e.shiftKey ? "column" : "row");
+        // Split orientation. macOS: Cmd+D = row, Cmd+Shift+D = column.
+        // Linux/Win: Ctrl+Shift+D = row, Ctrl+Shift+E = column (KeyE below).
+        splitActivePane(isMac && e.shiftKey ? "column" : "row");
+      }
+      else if (!isMac && e.code === "KeyE") {
+        e.preventDefault();
+        splitActivePane("column");
       }
       else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
@@ -1303,12 +1313,12 @@ export default function App() {
         const next = findAdjacentPane(tab.root, tab.activePaneId, e.key);
         if (next) setActivePane(tab.id, next);
       }
-      else if (e.key === "r" || e.key === "R") {
+      else if (e.code === "KeyR") {
         e.preventDefault();
         if (e.shiftKey) reloadActive();
       }
-      else if (/^[1-9]$/.test(e.key)) {
-        const idx = parseInt(e.key, 10) - 1;
+      else if (/^Digit[1-9]$/.test(e.code)) {
+        const idx = parseInt(e.code.slice(5), 10) - 1;
         if (tabs[idx]) { e.preventDefault(); setActiveId(tabs[idx].id); }
       }
     };
@@ -1841,6 +1851,7 @@ export default function App() {
           </button>
         ) : <div style={{ flex: "0 0 auto" }} />}
         <select
+          className="agent-select"
           value={activePty?.agentId ?? ""}
           onChange={(e) => changeActiveAgent(e.target.value)}
           disabled={!activePty}
@@ -2004,6 +2015,13 @@ function Keycap({ k }: { k: string }) {
 }
 
 function modIcon(k: string): React.ReactNode | null {
+  // Off macOS, modifiers read as text ("Ctrl"/"Shift"/"Alt") — the ⌘⇧⌥⌃
+  // glyphs are macOS conventions and confuse Linux/Windows users.
+  if (!isMac) {
+    if (k === "cmd" || k === "ctrl") return "Ctrl";
+    if (k === "shift") return "Shift";
+    if (k === "opt") return "Alt";
+  }
   const sz = 11;
   const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (k) {
@@ -2051,6 +2069,33 @@ function arrowSvg(d: string) {
     </svg>
   );
 }
+
+// Shortcut table. `mac` = the ⌘ chords; `other` = the Linux/Windows chords,
+// where app actions use Ctrl+Shift (plain Ctrl belongs to the terminal) except
+// settings/zoom, which don't collide and stay on plain Ctrl. Keep in sync with
+// the keydown handler and the README Shortcuts table.
+const SHORTCUTS: { mac: string[]; other: string[]; label: string }[] = [
+  { mac: ["cmd", "T"], other: ["ctrl", "shift", "T"], label: "New tab" },
+  { mac: ["cmd", "W"], other: ["ctrl", "shift", "W"], label: "Close active pane" },
+  { mac: ["cmd", "D"], other: ["ctrl", "shift", "D"], label: "Split pane right" },
+  { mac: ["cmd", "shift", "D"], other: ["ctrl", "shift", "E"], label: "Split pane down" },
+  { mac: ["cmd", "opt", "left"], other: ["ctrl", "shift", "opt", "left"], label: "Focus pane left" },
+  { mac: ["cmd", "opt", "right"], other: ["ctrl", "shift", "opt", "right"], label: "Focus pane right" },
+  { mac: ["cmd", "opt", "up"], other: ["ctrl", "shift", "opt", "up"], label: "Focus pane up" },
+  { mac: ["cmd", "opt", "down"], other: ["ctrl", "shift", "opt", "down"], label: "Focus pane down" },
+  { mac: ["cmd", "shift", "R"], other: ["ctrl", "shift", "R"], label: "Reload active pane" },
+  { mac: ["cmd", "1–9"], other: ["ctrl", "shift", "1–9"], label: "Switch tab" },
+  { mac: ["ctrl", "Tab"], other: ["ctrl", "Tab"], label: "Next tab" },
+  { mac: ["ctrl", "shift", "Tab"], other: ["ctrl", "shift", "Tab"], label: "Previous tab" },
+  { mac: ["shift", "enter"], other: ["shift", "enter"], label: "Multi-line input (Claude Code)" },
+  { mac: ["cmd", ","], other: ["ctrl", ","], label: "Open settings" },
+  { mac: ["cmd", "+"], other: ["ctrl", "+"], label: "Zoom in" },
+  { mac: ["cmd", "−"], other: ["ctrl", "−"], label: "Zoom out" },
+  { mac: ["cmd", "0"], other: ["ctrl", "0"], label: "Reset zoom" },
+  { mac: ["cmd", "k"], other: ["ctrl", "shift", "k"], label: "Switch agent" },
+  { mac: ["cmd", "c"], other: ["ctrl", "shift", "c"], label: "Copy selection" },
+  { mac: ["cmd", "v"], other: ["ctrl", "shift", "v"], label: "Paste" },
+];
 
 function Shortcut({ keys, label }: { keys: string[]; label: string }) {
   return (
@@ -2438,24 +2483,9 @@ function SettingsModal({
               <>
                 <h2 className="settings-section-title">Keyboard shortcuts</h2>
                 <div className="shortcuts-list">
-                  <Shortcut keys={["cmd", "T"]} label="New tab" />
-                  <Shortcut keys={["cmd", "W"]} label="Close active pane" />
-                  <Shortcut keys={["cmd", "D"]} label="Split pane right" />
-                  <Shortcut keys={["cmd", "shift", "D"]} label="Split pane down" />
-                  <Shortcut keys={["cmd", "opt", "left"]} label="Focus pane left" />
-                  <Shortcut keys={["cmd", "opt", "right"]} label="Focus pane right" />
-                  <Shortcut keys={["cmd", "opt", "up"]} label="Focus pane up" />
-                  <Shortcut keys={["cmd", "opt", "down"]} label="Focus pane down" />
-                  <Shortcut keys={["cmd", "shift", "R"]} label="Reload active pane" />
-                  <Shortcut keys={["cmd", "1–9"]} label="Switch tab" />
-                  <Shortcut keys={["ctrl", "Tab"]} label="Next tab" />
-                  <Shortcut keys={["ctrl", "shift", "Tab"]} label="Previous tab" />
-                  <Shortcut keys={["shift", "enter"]} label="Multi-line input (Claude Code)" />
-                  <Shortcut keys={["cmd", ","]} label="Open settings" />
-                  <Shortcut keys={["cmd", "+"]} label="Zoom in" />
-                  <Shortcut keys={["cmd", "−"]} label="Zoom out" />
-                  <Shortcut keys={["cmd", "0"]} label="Reset zoom" />
-                  <Shortcut keys={["cmd", "k"]} label="Switch agent" />
+                  {SHORTCUTS.map((s, i) => (
+                    <Shortcut key={i} keys={isMac ? s.mac : s.other} label={s.label} />
+                  ))}
                 </div>
               </>
             )}
@@ -3966,13 +3996,45 @@ function TerminalView({
       if (e.key === "`" && e.ctrlKey && !e.metaKey && !e.altKey) return false;
       if (e.key === "Enter" && e.shiftKey) return false;
       // Let our document-capture handler own Cmd/Opt+Backspace.
-      if (e.key === "Backspace" && (e.metaKey || e.altKey)) return false;
+      // Cmd+Backspace is a macOS-only readline shim; Opt+Backspace works the
+      // same on every platform.
+      if (e.key === "Backspace" && ((isMac && e.metaKey) || e.altKey)) return false;
       // Cmd+Arrow and Opt+Arrow are translated to readline sequences below.
       // (Cmd+Opt+Arrow stays with the global handler for pane focus.)
+      // Cmd+Arrow is macOS-only; Opt+Arrow works the same on every platform.
       if ((e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")
           && !e.shiftKey && !e.ctrlKey
-          && ((e.metaKey && !e.altKey) || (e.altKey && !e.metaKey))) {
+          && ((isMac && e.metaKey && !e.altKey) || (e.altKey && !e.metaKey))) {
         return false;
+      }
+      // Linux/Windows terminal copy/paste (macOS uses the Edit menu + Cmd+C/V).
+      // Plain Ctrl+C/V stay with the shell (SIGINT / literal); the copy/paste
+      // chord is Ctrl+Shift+C / Ctrl+Shift+V, the terminal convention.
+      if (!isMac && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+        if (e.code === "KeyC") {
+          const sel = term.getSelection();
+          if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+          e.preventDefault();
+          return false; // swallow so it never sends ETX to the shell
+        }
+        if (e.code === "KeyV") {
+          e.preventDefault();
+          void (async () => {
+            // Mirror the mouse-paste path: a copied file inserts its path, else text.
+            try {
+              const paths = (await invoke<string[]>("read_clipboard_file_paths")).filter((p) => !IMAGE_EXT.test(p));
+              if (paths.length > 0) {
+                invoke("write_stdin", { sessionId, data: pathsToStdin(paths) }).catch(() => {});
+                return;
+              }
+            } catch {}
+            try {
+              const text = await navigator.clipboard.readText();
+              if (text) invoke("write_stdin", { sessionId, data: text }).catch(() => {});
+            } catch {}
+          })();
+          return false;
+        }
       }
       return true;
     });
@@ -4001,8 +4063,9 @@ function TerminalView({
         // Shift+Enter → ESC+CR (Claude Code's /terminal-setup multi-line).
         return send("\x1b\r");
       }
-      if (e.key === "Backspace" && e.metaKey && !e.ctrlKey) {
-        // Cmd+Backspace → kill line backwards (Ctrl+U).
+      if (isMac && e.key === "Backspace" && e.metaKey && !e.ctrlKey) {
+        // Cmd+Backspace → kill line backwards (Ctrl+U). macOS only — Linux/
+        // Windows have no Cmd key and native Ctrl+U already does this.
         return send("\x15");
       }
       if (e.key === "Backspace" && e.altKey && !e.metaKey && !e.ctrlKey) {
@@ -4011,7 +4074,9 @@ function TerminalView({
       }
       // macOS line-editing shortcuts — translate to readline control chars
       // so Claude Code's input (and any bash-like prompt) obeys them.
-      if (e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+      // macOS only — Linux/Windows have no Cmd key, and Ctrl+A/E there
+      // belong to the shell's own readline bindings.
+      if (isMac && e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey) {
         if (e.key === "ArrowLeft")  return send("\x01"); // Cmd+← → Ctrl+A (line start)
         if (e.key === "ArrowRight") return send("\x05"); // Cmd+→ → Ctrl+E (line end)
         if (e.key === "ArrowUp")    return send("\x01"); // Cmd+↑ → line start (doc-start analog)
@@ -4245,7 +4310,7 @@ function TerminalContextMenu({ menu, onClose }: { menu: TermMenuData; onClose: (
     });
     if (menu.linkKind === "path") {
       items.push({
-        label: "Reveal in Finder",
+        label: revealLabel,
         onClick: () => { invoke("reveal_in_finder", { path: menu.uri }).catch(() => {}); onClose(); },
       });
     }

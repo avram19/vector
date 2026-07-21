@@ -7,10 +7,12 @@
     "core:default",
     "core:event:default",
     "core:window:default",
+    "core:window:allow-set-theme",
     "notification:default",
     "dialog:default",
     "updater:default",
     "process:default",
-    "autostart:default"
+    "autostart:default",
+    "os:default"
   ]
 }

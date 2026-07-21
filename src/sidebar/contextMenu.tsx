@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { revealLabel } from "../platform";
 
 export type FileMenuItem = { label: string; onClick: () => void };
 
@@ -83,7 +84,7 @@ export function makeWorktreeMenuItems(
     });
   }
   items.push({
-    label: "Reveal in Finder",
+    label: revealLabel,
     onClick: () => {
       invoke("reveal_in_finder", { path: worktreePath }).catch(() => {});
     },
@@ -100,7 +101,7 @@ export function makeWorktreeMenuItems(
 export function makeFileMenuItems(path: string, isDir: boolean): FileMenuItem[] {
   const items: FileMenuItem[] = [
     {
-      label: "Reveal in Finder",
+      label: revealLabel,
       onClick: () => {
         invoke("reveal_in_finder", { path }).catch(() => {});
       },

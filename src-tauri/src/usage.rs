@@ -6,9 +6,12 @@
 //           rather than depending on a keychain crate — the output is small
 //           JSON and the call is rare (polled once per minute).
 
+#[cfg(target_os = "macos")]
 use crate::config;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "macos")]
 use sha2::{Digest, Sha256};
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -59,6 +62,7 @@ impl From<RawBucket> for Bucket {
 /// Custom profile → `"Claude Code-credentials-<sha8>"`, where the suffix is
 /// the first 8 hex chars of SHA-256 over the profile's absolute config dir
 /// path. This mirrors how Claude Code namespaces tokens per `CLAUDE_CONFIG_DIR`.
+#[cfg(target_os = "macos")]
 fn keychain_service_for_profile(profile_id: Option<&str>) -> Option<String> {
     match profile_id {
         None | Some("") | Some("__default__") => Some("Claude Code-credentials".into()),
@@ -74,7 +78,8 @@ fn keychain_service_for_profile(profile_id: Option<&str>) -> Option<String> {
     }
 }
 
-fn read_oauth_token(profile_id: Option<&str>) -> Option<String> {
+#[cfg(target_os = "macos")]
+pub(crate) fn read_oauth_token_keychain(profile_id: Option<&str>) -> Option<String> {
     // `security find-generic-password -s "<service>" -w` returns the password
     // (the JSON blob) on stdout. We parse out accessToken.
     let service = keychain_service_for_profile(profile_id)?;
@@ -92,7 +97,7 @@ fn read_oauth_token(profile_id: Option<&str>) -> Option<String> {
 }
 
 pub async fn fetch_claude_usage(profile_id: Option<&str>) -> Result<Option<ClaudeUsage>, String> {
-    let token = match read_oauth_token(profile_id) { Some(t) => t, None => return Ok(None) };
+    let token = match crate::platform::read_claude_credential(profile_id) { Some(t) => t, None => return Ok(None) };
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
         .build()

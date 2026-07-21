@@ -1,0 +1,36 @@
+name: linux-check
+# Fast Linux compile gate: type-checks every Linux #[cfg] branch on real Ubuntu
+# (macOS `cargo check` only compiles the macOS arms). No signing secrets, no
+# frontend build, no bundling — just `cargo check` on both Linux arches.
+on:
+  push:
+    branches: ["feat/linux-port"]
+  workflow_dispatch:
+jobs:
+  cargo-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04,     target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Build frontend
+        # generate_context!() embeds the frontend dist/, so it must exist
+        # before cargo check even though we don't bundle here.
+        run: |
+          npm ci
+          npm run build
+      - name: cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
