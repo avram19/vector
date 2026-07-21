@@ -22,4 +22,4 @@ MY_API_KEY = "..."
 - `env` — optional key/value environment variables injected into the spawned process, on top of Vector's own (`PATH`, `TERM`, `COLORTERM`, etc.).
 - `default` — which agent id new tabs should default to.
 
-Vector merges this file with the built-in agent list on every launch: your custom entries are added, and if you reuse a built-in id (like `claude`), your definition overrides it. There's no need to restart Vector after editing the file — just open a new tab.
+Vector merges this file with the built-in agent list on launch: your custom entries are added, and if you reuse a built-in id (like `claude`), your definition overrides it. The config is read once at startup, so **restart Vector** after editing the file for your changes to take effect.
