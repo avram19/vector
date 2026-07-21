@@ -48,7 +48,7 @@ This is the one risk CI could not verify.
 ## 8. Keybindings (Task 7 — Ctrl+Shift on Linux)
 - [ ] **Ctrl+Shift+T** opens a new tab.
 - [ ] **Ctrl+Shift+W** closes a tab.
-- [ ] Pane split shortcut works (row split; **column split = Ctrl+Shift+Alt+D** — 4-key chord, see Decisions below).
+- [ ] Pane split shortcut works (**row split = Ctrl+Shift+D**, **column split = Ctrl+Shift+E**).
 - [ ] Reload-agent shortcut works.
 - [ ] **Plain Ctrl+C** in a running process **reaches the shell** (interrupts it) — NOT captured by an app action.
 - [ ] Ctrl+D / Ctrl+U behave as normal shell controls.
@@ -65,6 +65,6 @@ This is the one risk CI could not verify.
 - [ ] Reveal in Finder, open-with-default, editor discovery (`mdfind`), usage meter (Keychain), clipboard file paste all unchanged.
 
 ## Decisions pending (tell me your call)
-- [ ] **Column-split chord** is currently **Ctrl+Shift+Alt+D** (4 keys). Keep, or remap to something lighter?
+- [x] **Column-split chord** — remapped from the original 4-key Ctrl+Shift+Alt+D to **Ctrl+Shift+E** (row split stays Ctrl+Shift+D).
 - [ ] **Wire signing secrets** (`TAURI_SIGNING_PRIVATE_KEY` + password) as repo secrets so `build.yml` can produce installable AppImages and the updater manifest?
 - [ ] Before cutting any Linux release: verify `release.sh`'s AppImage-tarball glob matches Tauri's real output filenames (flagged in Task 8 review).
