@@ -1,0 +1,18 @@
+---
+const features = [
+  ["Agent-native tabs", "Open a tab, pick an agent, start working. Resume Claude sessions from where you left off."],
+  ["Pane splits", "Split a tab into panes and run different agents side by side."],
+  ["File & diff previewer", "Preview code, diffs, markdown, and mermaid inline — no context switch."],
+  ["GitHub sidebar", "Repos, a PR inbox, and Actions, right next to your agent."],
+  ["Claude profiles", "Per-folder Claude configs with one-click switching."],
+  ["Cross-platform", "Native on macOS and Linux (x86_64 & arm64), with an in-app updater."],
+];
+---
+<section class="features">
+  <h2>What's inside</h2>
+  <div class="grid">
+    {features.map(([title, body]) => (
+      <article class="card"><h3>{title}</h3><p>{body}</p></article>
+    ))}
+  </div>
+</section>
