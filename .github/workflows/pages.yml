@@ -25,7 +25,7 @@ jobs:
       - uses: withastro/action@v3
         with:
           path: ./website
-          node-version: 20
+          node-version: 22 # Astro 7 requires Node >= 22.12
   deploy:
     needs: build
     runs-on: ubuntu-latest
