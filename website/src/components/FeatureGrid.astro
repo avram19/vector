@@ -6,24 +6,57 @@ import github from "../assets/feat-github.png";
 import profiles from "../assets/feat-profiles.png";
 
 const features = [
-  ["Agent-native tabs", "Open a tab, pick an agent, start working. Resume Claude sessions from where you left off.", tabs],
-  ["Pane splits", "Split a tab into panes and run different agents side by side.", panes],
-  ["File & diff previewer", "Preview code, diffs, markdown, and mermaid inline — no context switch.", preview],
-  ["GitHub sidebar", "Repos, a PR inbox, and Actions, right next to your agent.", github],
-  ["Claude profiles", "Per-folder Claude configs with one-click switching.", profiles],
-  ["Cross-platform", "Native on macOS, Linux (x86_64 & arm64), and Windows, with an in-app updater.", null],
+  { title: "Agent-native tabs", body: "Open a tab, pick an agent, start working. Resume Claude sessions from where you left off.", shot: tabs },
+  { title: "Pane splits", body: "Split a tab into panes and run different agents side by side.", shot: panes },
+  { title: "File & diff previewer", body: "Preview code, diffs, markdown, and mermaid inline — no context switch.", shot: preview },
+  { title: "GitHub sidebar", body: "Repos, a PR inbox, and Actions, right next to your agent.", shot: github },
+  { title: "Claude profiles", body: "Per-folder Claude configs with one-click switching.", shot: profiles },
+  { title: "Cross-platform", body: "Native on macOS, Linux (x86_64 & arm64), and Windows, with an in-app updater.", shot: null },
 ];
 ---
 <section class="features">
   <h2>What's inside</h2>
-  <div class="grid">
-    {features.map(([title, body, shot]) => (
-      <article class="card">
-        {shot && (
-          <img class="card-shot" src={shot.src} width={shot.width} height={shot.height} alt={`${title} screenshot`} loading="lazy" />
-        )}
-        <h3>{title}</h3><p>{body}</p>
-      </article>
-    ))}
-  </div>
+  {features.map((f, i) => (
+    <div class={`feature-row${i % 2 === 1 ? " reverse" : ""}${f.shot ? "" : " text-only"}`}>
+      {f.shot && (
+        <div class="feature-media">
+          <button class="media-zoom" type="button" data-full={f.shot.src} aria-label={`View ${f.title} screenshot larger`}>
+            <img src={f.shot.src} width={f.shot.width} height={f.shot.height} alt={`${f.title} in Vector`} loading="lazy" />
+          </button>
+        </div>
+      )}
+      <div class="feature-text">
+        <h3>{f.title}</h3>
+        <p>{f.body}</p>
+      </div>
+    </div>
+  ))}
 </section>
+
+<div id="shot-modal" class="shot-modal" hidden>
+  <img src="" alt="" />
+</div>
+
+<script>
+  const modal = document.getElementById("shot-modal");
+  if (modal) {
+    const modalImg = modal.querySelector("img");
+    const open = (src: string) => {
+      modalImg.setAttribute("src", src);
+      modal.removeAttribute("hidden");
+      document.body.style.overflow = "hidden";
+    };
+    const close = () => {
+      modal.setAttribute("hidden", "");
+      modalImg.setAttribute("src", "");
+      document.body.style.overflow = "";
+    };
+    document.querySelectorAll(".media-zoom").forEach((btn) => {
+      btn.addEventListener("click", () => open((btn as HTMLElement).dataset.full || ""));
+    });
+    modal.addEventListener("click", close);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.hasAttribute("hidden")) close();
+    });
+  }
+</script>
