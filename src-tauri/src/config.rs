@@ -214,21 +214,52 @@ pub fn which_path(bin: &str) -> Option<PathBuf> {
     }
     let path = augmented_path();
     for dir in std::env::split_paths(&path) {
-        let full = dir.join(bin);
-        if full.is_file() { return Some(full); }
+        // On Windows, prefer the executable-extension variants. An extensionless
+        // file is not runnable via CreateProcess — and npm ships a bare shell
+        // shim (`claude`) alongside `claude.cmd`, so matching the bare name first
+        // would hand back the unrunnable sh script. Skip the ext probe when `bin`
+        // already carries an executable extension.
         #[cfg(windows)]
         {
-            for ext in ["exe", "cmd", "bat"] {
-                let f = dir.join(format!("{bin}.{ext}"));
-                if f.is_file() { return Some(f); }
+            let has_exec_ext = std::path::Path::new(bin)
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| matches!(e.to_ascii_lowercase().as_str(), "exe" | "cmd" | "bat" | "com"))
+                .unwrap_or(false);
+            if !has_exec_ext {
+                for ext in ["exe", "cmd", "bat"] {
+                    let f = dir.join(format!("{bin}.{ext}"));
+                    if f.is_file() { return Some(f); }
+                }
             }
         }
+        let full = dir.join(bin);
+        if full.is_file() { return Some(full); }
     }
     None
 }
 
 pub fn which(bin: &str) -> bool {
     which_path(bin).is_some()
+}
+
+/// Build a `std::process::Command` that does NOT flash a console window on
+/// Windows. A GUI-subsystem app (Vector) spawning a console program — `git`,
+/// `gh`, `cmd`, `explorer` — pops a visible console window per call unless
+/// `CREATE_NO_WINDOW` is set. Worktree discovery alone fires many `git`
+/// invocations on startup (× every auto-resumed tab), so without this the
+/// window flickers with console pop-ups for a few seconds. No-op off Windows.
+#[allow(dead_code)]
+pub fn silent_command<S: AsRef<std::ffi::OsStr>>(program: S) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
 }
 
 /// Whether an agent caches terminal colors at startup and needs a process
