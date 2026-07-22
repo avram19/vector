@@ -21,6 +21,8 @@ not a shell prompt.
 
 **Linux** (x86_64/aarch64, WebKitGTK) — grab the `.AppImage` or `.deb` from [Releases](https://github.com/avram19/vector/releases); for the AppImage, `chmod +x Vector_*.AppImage` and run it.
 
+**Windows** (x64) — download the `.exe` installer from [Releases](https://github.com/avram19/vector/releases) and run it. The build is unsigned, so SmartScreen warns on first launch — click **More info → Run anyway**.
+
 Full install steps and first-run notes: [docs → Getting Started → Install](https://avram19.github.io/vector/getting-started/install/).
 
 ## Build from source

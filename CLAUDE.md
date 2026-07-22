@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What Vector is
 
-A Tauri v2 desktop app (macOS + Linux; Windows in progress) that replaces the shell inside terminal tabs with AI coding agents (Claude Code, Codex, etc.). Each tab owns a PTY running the agent's CLI, rendered into xterm.js. See `README.md` for user-facing behavior and the full agent list. OS-divergent logic lives behind `src-tauri/src/platform/` (compiler-enforced per-OS surface); the Linux port is documented in `docs/superpowers/plans/2026-07-20-linux-port-milestone-1.md`.
+A Tauri v2 desktop app (macOS, Linux, Windows) that replaces the shell inside terminal tabs with AI coding agents (Claude Code, Codex, etc.). Each tab owns a PTY running the agent's CLI, rendered into xterm.js. See `README.md` for user-facing behavior and the full agent list. OS-divergent logic lives behind `src-tauri/src/platform/` (compiler-enforced per-OS surface); the Linux port is documented in `docs/superpowers/plans/2026-07-20-linux-port-milestone-1.md`.
 
 ## Build / run / release
 

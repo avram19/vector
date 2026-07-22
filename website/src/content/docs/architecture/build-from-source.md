@@ -3,7 +3,7 @@ title: Build from source
 description: Requirements and commands for building Vector yourself.
 ---
 
-Requirements: Rust (stable), Node 20+, on macOS, Linux, or Windows (Windows support is in progress).
+Requirements: Rust (stable), Node 20+, on macOS, Linux, or Windows.
 
 ```bash
 npm install
