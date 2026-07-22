@@ -63,7 +63,12 @@ async fn default_agent(state: State<'_, AppState>) -> Result<String, String> {
 
 fn default_shell() -> Vec<String> {
     if cfg!(windows) {
-        vec!["powershell.exe".into()]
+        // PowerShell 7 (pwsh) if installed, else Windows PowerShell 5.
+        if config::which("pwsh.exe") {
+            vec!["pwsh.exe".into()]
+        } else {
+            vec!["powershell.exe".into()]
+        }
     } else if cfg!(target_os = "linux") {
         vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into())]
     } else {
@@ -235,30 +240,48 @@ async fn start_shell_session(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    let program = vec![shell.clone(), "-l".to_string()];
-    let path = config::augmented_path();
-    let mut env: Vec<(String, String)> = vec![
-        ("TERM".into(), "xterm-256color".into()),
-        ("COLORTERM".into(), "truecolor".into()),
-        ("TERM_PROGRAM".into(), "iTerm.app".into()),
-        ("TERM_PROGRAM_VERSION".into(), "3.6.6".into()),
-        ("PATH".into(), path.to_string_lossy().to_string()),
-    ];
+    // On Windows the shell is PowerShell (no `-l`, and no OSC-7 trampoline —
+    // live shell-cwd tracking is a deferred feature; see CLAUDE.md). Elsewhere
+    // the login shell gets the zsh/bash OSC-7 trampoline, unchanged.
+    #[cfg(windows)]
+    let (program, env): (Vec<String>, Vec<(String, String)>) = {
+        let path = config::augmented_path();
+        (
+            default_shell(),
+            vec![
+                ("TERM".into(), "xterm-256color".into()),
+                ("COLORTERM".into(), "truecolor".into()),
+                ("PATH".into(), path.to_string_lossy().to_string()),
+            ],
+        )
+    };
 
-    // ZDOTDIR trampoline: inject OSC 7 precmd silently for zsh only.
-    // For bash/fish we skip this for v0.3.3 — live cwd tracking won't update past initial.
-    if shell.ends_with("/zsh") || shell == "zsh" {
-        let zdotdir = std::env::temp_dir()
-            .join(format!("vector-zdotdir-{}", std::process::id()));
-        std::fs::create_dir_all(&zdotdir).map_err(|e| e.to_string())?;
+    #[cfg(not(windows))]
+    let (program, env) = {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+        let program = vec![shell.clone(), "-l".to_string()];
+        let path = config::augmented_path();
+        let mut env: Vec<(String, String)> = vec![
+            ("TERM".into(), "xterm-256color".into()),
+            ("COLORTERM".into(), "truecolor".into()),
+            ("TERM_PROGRAM".into(), "iTerm.app".into()),
+            ("TERM_PROGRAM_VERSION".into(), "3.6.6".into()),
+            ("PATH".into(), path.to_string_lossy().to_string()),
+        ];
 
-        // Capture the user's existing ZDOTDIR (or $HOME) so we can chain to their real .zshrc.
-        let user_zdotdir = std::env::var("ZDOTDIR")
-            .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().to_string_lossy().to_string());
+        // ZDOTDIR trampoline: inject OSC 7 precmd silently for zsh only.
+        // For bash/fish we skip this for v0.3.3 — live cwd tracking won't update past initial.
+        if shell.ends_with("/zsh") || shell == "zsh" {
+            let zdotdir = std::env::temp_dir()
+                .join(format!("vector-zdotdir-{}", std::process::id()));
+            std::fs::create_dir_all(&zdotdir).map_err(|e| e.to_string())?;
 
-        let zshrc_content = format!(
-            r#"# Vector shell trampoline — emit OSC 7 on every prompt so the host can track cwd.
+            // Capture the user's existing ZDOTDIR (or $HOME) so we can chain to their real .zshrc.
+            let user_zdotdir = std::env::var("ZDOTDIR")
+                .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().to_string_lossy().to_string());
+
+            let zshrc_content = format!(
+                r#"# Vector shell trampoline — emit OSC 7 on every prompt so the host can track cwd.
 _vector_osc7() {{ printf '\033]7;file://%s%s\007' "$HOST" "$PWD" }}
 typeset -ga precmd_functions
 precmd_functions+=(_vector_osc7)
@@ -266,25 +289,28 @@ _vector_osc7
 # Source the user's real .zshrc if present
 [ -f "{user_zdotdir}/.zshrc" ] && source "{user_zdotdir}/.zshrc"
 "#
-        );
-        let zshrc_path = zdotdir.join(".zshrc");
-        std::fs::write(&zshrc_path, &zshrc_content).map_err(|e| e.to_string())?;
+            );
+            let zshrc_path = zdotdir.join(".zshrc");
+            std::fs::write(&zshrc_path, &zshrc_content).map_err(|e| e.to_string())?;
 
-        env.push(("ZDOTDIR".into(), zdotdir.to_string_lossy().to_string()));
-        env.push(("VECTOR_USER_ZDOTDIR".into(), user_zdotdir));
-    }
-    // bash: PROMPT_COMMAND is read from the environment, so we can inject OSC-7
-    // without a temp rcfile. Prepend so the user's own PROMPT_COMMAND still runs.
-    else if shell.ends_with("/bash") || shell == "bash" {
-        let existing = std::env::var("PROMPT_COMMAND").unwrap_or_default();
-        let osc7 = r#"printf '\033]7;file://%s%s\007' "$HOSTNAME" "$PWD""#;
-        let combined = if existing.is_empty() {
-            osc7.to_string()
-        } else {
-            format!("{osc7}; {existing}")
-        };
-        env.push(("PROMPT_COMMAND".into(), combined));
-    }
+            env.push(("ZDOTDIR".into(), zdotdir.to_string_lossy().to_string()));
+            env.push(("VECTOR_USER_ZDOTDIR".into(), user_zdotdir));
+        }
+        // bash: PROMPT_COMMAND is read from the environment, so we can inject OSC-7
+        // without a temp rcfile. Prepend so the user's own PROMPT_COMMAND still runs.
+        else if shell.ends_with("/bash") || shell == "bash" {
+            let existing = std::env::var("PROMPT_COMMAND").unwrap_or_default();
+            let osc7 = r#"printf '\033]7;file://%s%s\007' "$HOSTNAME" "$PWD""#;
+            let combined = if existing.is_empty() {
+                osc7.to_string()
+            } else {
+                format!("{osc7}; {existing}")
+            };
+            env.push(("PROMPT_COMMAND".into(), combined));
+        }
+
+        (program, env)
+    };
 
     let cwd_path = cwd
         .map(std::path::PathBuf::from)

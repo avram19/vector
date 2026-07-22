@@ -3,7 +3,7 @@ title: How it's built
 description: A tour of Vector's architecture — Tauri v2, xterm.js, the PTY pipeline, and the cross-platform layer.
 ---
 
-Vector is a [Tauri v2](https://v2.tauri.app/) desktop app. Each tab replaces the shell inside a terminal with an AI coding agent's CLI (Claude Code, Codex, etc.) — the tab owns a PTY running that agent, rendered into the page with [xterm.js](https://xtermjs.org/). It ships on macOS and Linux, with Windows support in progress.
+Vector is a [Tauri v2](https://v2.tauri.app/) desktop app. Each tab replaces the shell inside a terminal with an AI coding agent's CLI (Claude Code, Codex, etc.) — the tab owns a PTY running that agent, rendered into the page with [xterm.js](https://xtermjs.org/). It ships on macOS, Linux, and Windows.
 
 ## Frontend
 

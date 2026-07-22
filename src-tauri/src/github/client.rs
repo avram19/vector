@@ -1,5 +1,3 @@
-use std::process::Command;
-
 use crate::config;
 
 /// Resolve the `gh` binary against Vector's augmented PATH (GUI apps start with
@@ -12,7 +10,7 @@ pub fn gh_path() -> Option<std::path::PathBuf> {
 /// `Err(stderr)`. PATH is augmented so gh's own child processes (git) resolve.
 pub fn run_gh(args: &[&str]) -> Result<String, String> {
     let gh = gh_path().ok_or_else(|| "gh CLI not found on PATH".to_string())?;
-    let out = Command::new(&gh)
+    let out = crate::config::silent_command(&gh)
         .args(args)
         .env("PATH", config::augmented_path())
         .output()

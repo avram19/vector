@@ -293,7 +293,24 @@ pub async fn installed_editors(state: State<'_, AppState>) -> Result<Vec<EditorI
         }).collect()
     }).await.map_err(|e| e.to_string())?;
 
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    #[cfg(target_os = "windows")]
+    let found = tauri::async_runtime::spawn_blocking(|| -> Vec<EditorInfo> {
+        // (binary_name, display_name) — resolved against the augmented PATH
+        // (which_path probes .cmd/.exe). bundle_id carries the binary name.
+        const WINDOWS_EDITORS: &[(&str, &str)] = &[
+            ("code", "VS Code"), ("cursor", "Cursor"), ("windsurf", "Windsurf"),
+            ("zed", "Zed"), ("subl", "Sublime Text"), ("nvim", "Neovim"),
+            ("code-insiders", "VS Code Insiders"),
+        ];
+        WINDOWS_EDITORS.iter().filter_map(|&(bin, name)| {
+            config::which_path(bin).map(|_| EditorInfo {
+                bundle_id: bin.to_string(),
+                display_name: name.to_string(),
+            })
+        }).collect()
+    }).await.map_err(|e| e.to_string())?;
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     let found: Vec<EditorInfo> = vec![];
 
     *state.installed_editors.lock() = Some(found.clone());
@@ -325,7 +342,14 @@ pub fn open_in_editor(bundle_id: String, path: PathBuf) -> Result<(), String> {
         return Ok(());
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    #[cfg(target_os = "windows")]
+    {
+        let bin = config::which_path(&bundle_id).ok_or_else(|| format!("{bundle_id} not found"))?;
+        config::silent_command(bin).arg(&path).spawn().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
         Err("open_in_editor is not supported on this platform".to_string())
     }

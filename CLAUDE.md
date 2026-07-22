@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What Vector is
 
-A Tauri v2 desktop app (macOS + Linux; Windows in progress) that replaces the shell inside terminal tabs with AI coding agents (Claude Code, Codex, etc.). Each tab owns a PTY running the agent's CLI, rendered into xterm.js. See `README.md` for user-facing behavior and the full agent list. OS-divergent logic lives behind `src-tauri/src/platform/` (compiler-enforced per-OS surface); the Linux port is documented in `docs/superpowers/plans/2026-07-20-linux-port-milestone-1.md`.
+A Tauri v2 desktop app (macOS, Linux, Windows) that replaces the shell inside terminal tabs with AI coding agents (Claude Code, Codex, etc.). Each tab owns a PTY running the agent's CLI, rendered into xterm.js. See `README.md` for user-facing behavior and the full agent list. OS-divergent logic lives behind `src-tauri/src/platform/` (compiler-enforced per-OS surface); the Linux port is documented in `docs/superpowers/plans/2026-07-20-linux-port-milestone-1.md`.
 
 ## Build / run / release
 
@@ -76,6 +76,7 @@ A prior attempt to rewrite CUF (`ESC[nC`) into literal spaces with SGR-inverse/b
 - **Bundle identifier** `dev.vector.app` ends in `.app` (Tauri warns); changing it invalidates the updater for existing installs.
 - **Pinned versions**: all `package.json` deps are pinned exactly (no `^`/`~`). Dependabot alerts have been addressed by pinning. Don't loosen constraints to quiet a warning.
 - **License**: PolyForm Noncommercial 1.0.0. Commercial use requires a separate license.
+- **Windows shell cwd**: Windows ships without the OSC-7 shell trampoline (macOS/Linux use zsh ZDOTDIR / bash PROMPT_COMMAND). `read_agent_cwd` (PEB walk in `platform/windows.rs::process_cwd`) covers agent panes and shell-panel-expand; a shell pane's live cwd does not follow `cd`. Deferred follow-up: a PowerShell `prompt`-function trampoline.
 
 ## Updating this file (meta-rule)
 
