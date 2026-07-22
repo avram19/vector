@@ -137,7 +137,10 @@ pub fn process_cwd(pid: u32) -> Option<String> {
             if !read_at(params + 0x38, &mut len_u16 as *mut _ as *mut c_void, 2) {
                 return None;
             }
-            if len_u16 == 0 || len_u16 > 0x7ffe {
+            // Reject 0, over-long, or odd Length: a UTF-16 byte length must be
+            // even, and an odd value would make `wbuf` (sized len/2 u16s) one
+            // byte short of the `len_u16`-byte ReadProcessMemory below.
+            if len_u16 == 0 || len_u16 > 0x7ffe || len_u16 % 2 != 0 {
                 return None;
             }
             let mut buf_ptr: usize = 0;
