@@ -12,6 +12,6 @@ if the filename/extension changes. Keep dark theme unless noted.
 | feat-preview.* | Code / diff / mermaid preview in a pane | 800×520 |
 | feat-github.* | GitHub sidebar — PR inbox or Actions | 800×520 |
 | feat-profiles.* | Claude profiles manager or the profile pill | 800×520 |
-| feat-crossplatform.* | macOS + Linux (or a Linux window) | 800×520 |
+| feat-crossplatform.* | macOS + Linux + Windows | 800×520 |
 | linux.* | Vector running on Linux (Ubuntu VM) | 1200×760 |
 | (light theme) | One light-theme window for the Themes doc | — |
