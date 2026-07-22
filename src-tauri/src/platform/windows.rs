@@ -162,5 +162,4 @@ pub fn process_cwd(pid: u32) -> Option<String> {
     }
 }
 pub fn clipboard_file_paths() -> Vec<String> { todo!("Milestone 2: CF_HDROP") }
-pub fn clipboard_file_paths() -> Vec<String> { todo!("Milestone 2: CF_HDROP") }
 pub fn read_claude_credential(_profile_id: Option<&str>) -> Option<String> { todo!("Milestone 2: plaintext .credentials.json") }
