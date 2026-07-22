@@ -20,7 +20,10 @@ body.landing { margin:0; background:var(--bg); color:var(--fg); font-family: sys
 .features, .agents, .vibe, .download { padding:48px 0; border-top:1px solid var(--border); }
 .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:18px; }
 .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
-.card h3 { margin:0 0 8px; } .card p { color:var(--muted); margin:0; }
+.card { padding:0; overflow:hidden; }
+.card-shot { width:100%; height:auto; aspect-ratio:800/520; object-fit:cover; display:block; border-bottom:1px solid var(--border); background:var(--card); }
+.card h3 { margin:16px 20px 8px; }
+.card p { margin:0 20px 20px; color:var(--muted); }
 .agent-list { list-style:none; display:flex; flex-wrap:wrap; gap:10px; padding:0; }
 .agent-list li { background:var(--card); border:1px solid var(--border); border-radius:999px; padding:6px 14px; color:var(--muted); }
 .vibe p { color:var(--muted); max-width:760px; }

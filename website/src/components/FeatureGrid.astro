@@ -1,18 +1,29 @@
 ---
+import tabs from "../assets/feat-tabs.png";
+import panes from "../assets/feat-panes.png";
+import preview from "../assets/feat-preview.png";
+import github from "../assets/feat-github.png";
+import profiles from "../assets/feat-profiles.png";
+
 const features = [
-  ["Agent-native tabs", "Open a tab, pick an agent, start working. Resume Claude sessions from where you left off."],
-  ["Pane splits", "Split a tab into panes and run different agents side by side."],
-  ["File & diff previewer", "Preview code, diffs, markdown, and mermaid inline — no context switch."],
-  ["GitHub sidebar", "Repos, a PR inbox, and Actions, right next to your agent."],
-  ["Claude profiles", "Per-folder Claude configs with one-click switching."],
-  ["Cross-platform", "Native on macOS, Linux (x86_64 & arm64), and Windows, with an in-app updater."],
+  ["Agent-native tabs", "Open a tab, pick an agent, start working. Resume Claude sessions from where you left off.", tabs],
+  ["Pane splits", "Split a tab into panes and run different agents side by side.", panes],
+  ["File & diff previewer", "Preview code, diffs, markdown, and mermaid inline — no context switch.", preview],
+  ["GitHub sidebar", "Repos, a PR inbox, and Actions, right next to your agent.", github],
+  ["Claude profiles", "Per-folder Claude configs with one-click switching.", profiles],
+  ["Cross-platform", "Native on macOS, Linux (x86_64 & arm64), and Windows, with an in-app updater.", null],
 ];
 ---
 <section class="features">
   <h2>What's inside</h2>
   <div class="grid">
-    {features.map(([title, body]) => (
-      <article class="card"><h3>{title}</h3><p>{body}</p></article>
+    {features.map(([title, body, shot]) => (
+      <article class="card">
+        {shot && (
+          <img class="card-shot" src={shot.src} width={shot.width} height={shot.height} alt={`${title} screenshot`} loading="lazy" />
+        )}
+        <h3>{title}</h3><p>{body}</p>
+      </article>
     ))}
   </div>
 </section>
