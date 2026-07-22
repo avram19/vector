@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in Vector isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please update to the latest release first
+        (Help → Check for Updates…) — it may already be fixed.
+        **Do not report security issues here** — see the [Security policy](https://github.com/avram19/vector/security/policy).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, and what you expected instead.
+      placeholder: When I ..., Vector ... — I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a tab with ...
+        2. Split the pane / paste / cd ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (aarch64)
+        - Windows (x64)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Vector version
+      description: Shown by the version pill / in Help. e.g. v0.5.0
+      placeholder: v0.5.0
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent(s) involved
+      description: Which agent was in the tab, if relevant (Claude Code, Codex, a raw shell, …)?
+      placeholder: Claude Code
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Any relevant terminal output, screenshots, or recordings. Code renders automatically, no backticks needed.
+      render: shell
+    validations:
+      required: false

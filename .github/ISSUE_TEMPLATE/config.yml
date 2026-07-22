@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://avram19.github.io/vector/
+    about: Guides, shortcuts, and how-tos — your question may already be answered here.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/avram19/vector/security/advisories/new
+    about: Please report security issues privately, not as public issues.
