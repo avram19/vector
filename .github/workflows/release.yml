@@ -117,7 +117,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v${{ needs.gate.outputs.version }}
-          releaseName: Vector v${{ needs.gate.outputs.version }}
+          releaseName: v${{ needs.gate.outputs.version }}
           releaseBody: ${{ needs.gate.outputs.notes }}
           releaseDraft: false
           prerelease: false
