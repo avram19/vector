@@ -12,6 +12,12 @@ short and user-facing: `- **Thing** — what the user gets.`
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-22
+
+- **Windows support (x64)** — Vector now builds, runs, and self-updates on Windows 10/11 via an NSIS installer. Agent directory tracking, reveal-in-Explorer, open-in-default-app, clipboard file paste, editor discovery, and PowerShell/pwsh shells are all wired up.
+- **Known limitation** — on Windows, a *shell* pane's directory doesn't update live as you `cd` (it refreshes when you open the shell panel); agent panes are unaffected. Live shell tracking is a planned follow-up.
+- **Note** — Windows builds are unsigned; SmartScreen shows a "Windows protected your PC" prompt on first launch (click *More info → Run anyway*).
+
 ## [0.4.2] - 2026-07-21
 
 - **Security fixes** — updated dependencies to close all known advisories (markdown/diff preview XSS via DOMPurify/Mermaid, a Tauri IPC issue, and a TLS certificate-parsing bug).
