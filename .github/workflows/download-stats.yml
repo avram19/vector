@@ -1,0 +1,47 @@
+name: download-stats
+# Compute installer-only download analytics from the Releases API and publish
+# them to the `stats` branch (downloads-badge.json + downloads.json + history.json).
+# The README/website badge is a shields endpoint pointing at downloads-badge.json;
+# the landing fetches downloads.json/history.json client-side. See
+# scripts/download-stats.mjs for the install-vs-update accounting.
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily, 06:17 UTC
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["release"] # refresh promptly after a release publishes
+    types: [completed]
+
+# Only the stats branch is written; least privilege otherwise.
+permissions:
+  contents: write
+
+concurrency:
+  group: download-stats
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # for scripts/download-stats.mjs (main)
+      - name: Fetch releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --paginate "repos/${{ github.repository }}/releases" > releases.json
+      - name: Seed output dir with existing history
+        run: |
+          mkdir -p out
+          git fetch origin stats 2>/dev/null || true
+          git show origin/stats:history.json > out/history.json 2>/dev/null || echo "[]" > out/history.json
+      - name: Compute stats
+        run: node scripts/download-stats.mjs releases.json out/history.json out
+      - name: Publish to stats branch
+        run: |
+          cd out
+          git init -q -b stats
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add downloads-badge.json downloads.json history.json
+          git commit -q -m "chore(stats): update download analytics"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" stats:stats

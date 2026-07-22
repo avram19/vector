@@ -1,6 +1,6 @@
 # Vector
 
-[![Downloads](https://img.shields.io/github/downloads/avram19/vector/total)](https://github.com/avram19/vector/releases)
+[![Downloads](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/avram19/vector/stats/downloads-badge.json)](https://github.com/avram19/vector/releases)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](./LICENSE)
 [![Docs](https://img.shields.io/badge/docs-avram19.github.io%2Fvector-informational)](https://avram19.github.io/vector/)
 

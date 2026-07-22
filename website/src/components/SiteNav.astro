@@ -1,12 +1,33 @@
 ---
 import logo from "../assets/logo.png";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const STATS = "https://raw.githubusercontent.com/avram19/vector/stats/downloads.json";
 ---
 <header class="nav">
-  <a class="brand" href={`${base}/`} style="display:inline-flex;align-items:center;gap:8px;"><img src={logo.src} width="26" height="26" alt="" /> Vector</a>
+  <span class="brand-wrap">
+    <a class="brand" href={`${base}/`} style="display:inline-flex;align-items:center;gap:8px;"><img src={logo.src} width="26" height="26" alt="" /> Vector</a>
+    <a class="ver-pill" hidden data-stats={STATS} href="https://github.com/avram19/vector/releases/latest" aria-label="Latest release"></a>
+  </span>
   <nav>
     <a href={`${base}/getting-started/install/`}>Docs</a>
     <a href="https://github.com/avram19/vector">GitHub</a>
     <a class="btn" href={`${base}/#download`}>Download</a>
   </nav>
 </header>
+
+<script>
+  const pill = document.querySelector<HTMLAnchorElement>(".ver-pill");
+  if (pill) {
+    (async () => {
+      try {
+        const s = await fetch(pill.dataset.stats!, { cache: "no-store" }).then((r) => r.json());
+        if (s.version) {
+          pill.textContent = s.version;
+          pill.hidden = false;
+        }
+      } catch {
+        /* leave hidden */
+      }
+    })();
+  }
+</script>

@@ -1,13 +1,51 @@
 ---
+// Per-OS install counts live inside each download card, fetched client-side from
+// the `stats` branch (updated daily by .github/workflows/download-stats.yml).
+// Installer-only counts — excludes the updater's traffic. Degrades silently.
 const releases = "https://github.com/avram19/vector/releases/latest";
+const STATS = "https://raw.githubusercontent.com/avram19/vector/stats/downloads.json";
 ---
-<section class="download" id="download">
+<section class="download" id="download" data-stats={STATS}>
   <h2>Get Vector</h2>
   <div class="dl-cards">
-    <a class="dl" href={releases}><strong>macOS</strong><span>.dmg (Apple Silicon)</span></a>
-    <a class="dl" href={releases}><strong>Linux</strong><span>.AppImage / .deb (x86_64 &amp; arm64)</span></a>
-    <a class="dl" href={releases}><strong>Windows</strong><span>.exe installer (x64)</span></a>
+    <a class="dl" href={releases}>
+      <strong>macOS</strong>
+      <span>.dmg (Apple Silicon)</span>
+      <span class="dl-count" data-os="macos"></span>
+    </a>
+    <a class="dl" href={releases}>
+      <strong>Linux</strong>
+      <span>.AppImage / .deb (x86_64 &amp; arm64)</span>
+      <span class="dl-count" data-os="linux"></span>
+    </a>
+    <a class="dl" href={releases}>
+      <strong>Windows</strong>
+      <span>.exe installer (x64)</span>
+      <span class="dl-count" data-os="windows"></span>
+    </a>
   </div>
   <p class="dl-note">Unsigned builds — see the docs for the first-launch step on macOS and Windows. Updates arrive in-app.</p>
-  <p><img alt="Total downloads" src="https://img.shields.io/github/downloads/avram19/vector/total?style=flat&label=downloads" /></p>
 </section>
+
+<script>
+  const sec = document.querySelector<HTMLElement>(".download");
+  if (sec) {
+    (async () => {
+      try {
+        const s = await fetch(sec.dataset.stats!, { cache: "no-store" }).then((r) => r.json());
+        sec.querySelectorAll<HTMLElement>(".dl-count").forEach((el) => {
+          const n = Number(s[el.dataset.os!] || 0);
+          if (n > 0) {
+            el.textContent = "↓ " + n.toLocaleString();
+            el.title = n.toLocaleString() + " downloads";
+          } else {
+            el.textContent = "New";
+            el.classList.add("is-new");
+          }
+        });
+      } catch {
+        /* leave counts blank */
+      }
+    })();
+  }
+</script>

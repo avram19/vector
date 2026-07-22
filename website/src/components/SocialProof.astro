@@ -1,0 +1,27 @@
+---
+// Social-proof line under the hero. Total installs (installer-only) fetched
+// client-side from the `stats` branch. Hidden until it loads, and stays hidden
+// if there's no data — never shows a placeholder or a zero.
+const STATS = "https://raw.githubusercontent.com/avram19/vector/stats/downloads.json";
+---
+<p class="social-proof" hidden data-stats={STATS}>
+  Now the terminal for <strong class="sp-num"></strong> <span class="sp-word"></span>
+</p>
+
+<script>
+  const el = document.querySelector<HTMLElement>(".social-proof");
+  if (el) {
+    (async () => {
+      try {
+        const s = await fetch(el.dataset.stats!, { cache: "no-store" }).then((r) => r.json());
+        const n = Number(s.total) || 0;
+        if (n <= 0) return;
+        el.querySelector(".sp-num")!.textContent = n.toLocaleString();
+        el.querySelector(".sp-word")!.textContent = n === 1 ? "developer" : "developers";
+        el.hidden = false;
+      } catch {
+        /* leave hidden */
+      }
+    })();
+  }
+</script>
