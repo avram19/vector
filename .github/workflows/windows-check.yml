@@ -1,0 +1,33 @@
+name: windows-check
+# Fast Windows compile gate: type-checks every Windows #[cfg] branch on a real
+# windows-latest runner (macOS/Linux `cargo check` never compiles the Windows
+# arms). No signing secrets, no bundling — just `cargo check`.
+on:
+  push:
+    branches: [main]
+    paths: ["src-tauri/**", ".github/workflows/windows-check.yml", "package.json", "package-lock.json"]
+  pull_request:
+    paths: ["src-tauri/**", ".github/workflows/windows-check.yml", "package.json", "package-lock.json"]
+  workflow_dispatch:
+
+# Least-privilege GITHUB_TOKEN: this workflow only reads the repo.
+permissions:
+  contents: read
+
+jobs:
+  cargo-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "x86_64-pc-windows-msvc" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Build frontend
+        # generate_context!() embeds the frontend dist/, so it must exist
+        # before cargo check even though we don't bundle here.
+        run: |
+          npm ci
+          npm run build
+      - name: cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
