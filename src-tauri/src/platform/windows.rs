@@ -161,5 +161,63 @@ pub fn process_cwd(pid: u32) -> Option<String> {
         out
     }
 }
-pub fn clipboard_file_paths() -> Vec<String> { todo!("Milestone 2: CF_HDROP") }
-pub fn read_claude_credential(_profile_id: Option<&str>) -> Option<String> { todo!("Milestone 2: plaintext .credentials.json") }
+/// Read file paths off the clipboard via the shell `CF_HDROP` format (what
+/// Explorer puts there on Ctrl-C of files). Raw Win32 FFI — no `windows` crate.
+/// Best-effort: returns an empty vec on any failure, so paste falls through to
+/// text handling.
+pub fn clipboard_file_paths() -> Vec<String> {
+    use std::os::raw::c_void;
+    type Handle = *mut c_void;
+    const CF_HDROP: u32 = 15;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn OpenClipboard(hwnd: Handle) -> i32;
+        fn CloseClipboard() -> i32;
+        fn GetClipboardData(format: u32) -> Handle;
+    }
+    #[link(name = "shell32")]
+    extern "system" {
+        fn DragQueryFileW(hdrop: Handle, index: u32, buf: *mut u16, cch: u32) -> u32;
+    }
+
+    let mut paths = Vec::new();
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return paths;
+        }
+        let hdrop = GetClipboardData(CF_HDROP);
+        if !hdrop.is_null() {
+            // index 0xFFFFFFFF returns the file count.
+            let count = DragQueryFileW(hdrop, 0xFFFF_FFFF, std::ptr::null_mut(), 0);
+            for i in 0..count {
+                // First call with null buffer returns length in chars (excl NUL).
+                let len = DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0);
+                if len == 0 {
+                    continue;
+                }
+                let mut buf: Vec<u16> = vec![0u16; (len + 1) as usize];
+                let got = DragQueryFileW(hdrop, i, buf.as_mut_ptr(), len + 1);
+                if got == 0 {
+                    continue;
+                }
+                buf.truncate(got as usize);
+                paths.push(String::from_utf16_lossy(&buf));
+            }
+        }
+        CloseClipboard();
+    }
+    paths
+}
+
+/// On Windows, Claude Code stores credentials as plaintext `.credentials.json`
+/// inside the profile config dir (or `~/.claude`). No keychain — identical to
+/// the Linux path.
+pub fn read_claude_credential(profile_id: Option<&str>) -> Option<String> {
+    let dir = match profile_id {
+        None | Some("") | Some("__default__") => dirs::home_dir()?.join(".claude"),
+        Some(id) => crate::config::profile_config_dir(id)?,
+    };
+    let raw = std::fs::read_to_string(dir.join(".credentials.json")).ok()?;
+    super::creds::extract_access_token(&raw)
+}
